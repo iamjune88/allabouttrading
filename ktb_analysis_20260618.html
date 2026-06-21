@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>KTB 선물 테크니컬 분석 | 2026-06-18</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d1117; color:#e6edf3; font-family:'Malgun Gothic',sans-serif; font-size:13px; }
+.header { background:#161b22; border-bottom:1px solid #30363d; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; }
+.header h1 { font-size:18px; font-weight:700; color:#f0f6fc; }
+.header .date { color:#8b949e; font-size:12px; }
+.pos-bar { display:flex; gap:12px; padding:12px 24px; background:#0d1117; border-bottom:1px solid #21262d; }
+.pos-card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px 16px; flex:1; }
+.pos-card.short { border-left:3px solid #f85149; }
+.pos-card.flat  { border-left:3px solid #8b949e; }
+.pos-card.profit { border-left:3px solid #3fb950; }
+.pos-card h3 { font-size:11px; color:#8b949e; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.pos-card .val { font-size:18px; font-weight:700; }
+.pos-card .sub { font-size:11px; color:#8b949e; margin-top:3px; }
+.red  { color:#f85149; }
+.green{ color:#3fb950; }
+.gray { color:#8b949e; }
+.yellow { color:#d29922; }
+.charts-row { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#21262d; }
+.chart-wrap { background:#0d1117; }
+.chart-header { padding:10px 16px; background:#161b22; border-bottom:1px solid #21262d; display:flex; align-items:center; justify-content:space-between; }
+.chart-header h2 { font-size:14px; font-weight:600; }
+.chart-header .ohlc { font-size:11px; color:#8b949e; }
+#chart3, #chart10 { height:340px; }
+.analysis { padding:20px 24px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.section { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px 16px; }
+.section h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #21262d; }
+.level-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #21262d11; }
+.level-row:last-child { border:none; }
+.level-label { color:#8b949e; font-size:12px; }
+.level-val { font-size:13px; font-weight:600; }
+.signal-box { padding:8px 12px; border-radius:6px; margin-top:8px; font-size:12px; line-height:1.6; }
+.signal-box.bearish { background:#f8514910; border:1px solid #f8514930; }
+.signal-box.bullish { background:#3fb95010; border:1px solid #3fb95030; }
+.signal-box.neutral { background:#d2992210; border:1px solid #d2992230; }
+.badge { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; }
+.badge.s { background:#f8514920; color:#f85149; }
+.badge.b { background:#3fb95020; color:#3fb950; }
+.badge.n { background:#d2992220; color:#d29922; }
+.full-analysis { margin:0 24px 20px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px 20px; }
+.full-analysis h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; }
+.full-analysis p { font-size:13px; line-height:1.8; color:#c9d1d9; margin-bottom:8px; }
+.full-analysis p span.key { color:#e6edf3; font-weight:600; }
+.verdict { display:flex; gap:12px; margin-top:12px; }
+.verdict-item { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; }
+.verdict-item h4 { font-size:11px; color:#8b949e; margin-bottom:4px; }
+.verdict-item p { font-size:12px; line-height:1.6; }
+table.ma-table { width:100%; border-collapse:collapse; }
+table.ma-table td { padding:5px 8px; border-bottom:1px solid #21262d; font-size:12px; }
+table.ma-table tr:last-child td { border:none; }
+table.ma-table td:first-child { color:#8b949e; }
+table.ma-table td:last-child { text-align:right; font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>KTB 선물 테크니컬 분석</h1>
+    <div class="date">2026-06-18 (수) | KTB3년물 · KTB10년물 일봉 기준</div>
+  </div>
+  <div class="badge s">베어마켓 구간</div>
+</div>
+
+<div class="pos-bar">
+  <div class="pos-card short">
+    <h3>KTB3 포지션</h3>
+    <div class="val red">SHORT 50계약</div>
+    <div class="sub">진입avg 103.6033 | 현재 103.21 | +0.39pt ≈ <span class="green">+5,850만원</span></div>
+  </div>
+  <div class="pos-card flat">
+    <h3>KTB10 포지션</h3>
+    <div class="val gray">FLAT (전량 커버)</div>
+    <div class="sub">6/16 avg 106.953 전량 커버 완료</div>
+  </div>
+  <div class="pos-card profit">
+    <h3>6/16 당일 손익</h3>
+    <div class="val green">+33,950,000원</div>
+    <div class="sub">선물정산차금 +34,200,000 / 수수료 -250,000</div>
+  </div>
+  <div class="pos-card short">
+    <h3>손절 트리거</h3>
+    <div class="val red">KTB3 102.70</div>
+    <div class="sub">이탈 시 잔여 50계약 즉시 청산</div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <h2>KRX:BM31! &nbsp;<span class="gray">KTB3년물 선물</span></h2>
+      <div class="ohlc" id="ohlc3">O- H- L- C-</div>
+    </div>
+    <div id="chart3"></div>
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <h2>KRX:BMA1! &nbsp;<span class="gray">KTB10년물 선물</span></h2>
+      <div class="ohlc" id="ohlc10">O- H- L- C-</div>
+    </div>
+    <div id="chart10"></div>
+  </div>
+</div>
+
+<div class="analysis">
+
+  <!-- KTB3 레벨 -->
+  <div class="section">
+    <h3>KTB3 주요 레벨</h3>
+    <table class="ma-table">
+      <tr><td>5MA</td><td class="yellow">103.27</td></tr>
+      <tr><td>20MA</td><td class="yellow">103.19</td></tr>
+      <tr><td>60MA</td><td class="gray">103.64</td></tr>
+      <tr><td>─────────────</td><td></td></tr>
+      <tr><td>저항1 (진입avg)</td><td class="red">103.60</td></tr>
+      <tr><td>저항2 (6/12 고점)</td><td class="red">103.55</td></tr>
+      <tr><td>현재가 (6/16)</td><td class="green" style="font-size:15px">103.21</td></tr>
+      <tr><td>지지1 (5/29 저점)</td><td class="yellow">102.94</td></tr>
+      <tr><td>지지2 (5/27 저점)</td><td class="red">102.77</td></tr>
+      <tr><td>손절라인</td><td class="red">102.70</td></tr>
+    </table>
+    <div class="signal-box bearish" style="margin-top:10px">
+      <b class="red">SHORT 유지</b> — 60MA(103.64) 대비 현재가 괴리 유지.<br>
+      103.55 이하 유지 시 하락 구조 지속. 102.94 이탈 여부가 다음 핵심.
+    </div>
+  </div>
+
+  <!-- KTB10 레벨 -->
+  <div class="section">
+    <h3>KTB10 주요 레벨</h3>
+    <table class="ma-table">
+      <tr><td>5MA</td><td class="yellow">106.74</td></tr>
+      <tr><td>20MA</td><td class="yellow">106.66</td></tr>
+      <tr><td>60MA</td><td class="gray">108.35</td></tr>
+      <tr><td>─────────────</td><td></td></tr>
+      <tr><td>저항1 (5월 고점대)</td><td class="red">107.50~107.60</td></tr>
+      <tr><td>현재가 (6/16)</td><td class="green" style="font-size:15px">107.25</td></tr>
+      <tr><td>지지1 (20MA)</td><td class="yellow">106.66</td></tr>
+      <tr><td>지지2 (6/9 저점)</td><td class="yellow">105.95</td></tr>
+      <tr><td>핵심 지지</td><td class="red">105.42</td></tr>
+    </table>
+    <div class="signal-box neutral" style="margin-top:10px">
+      <b class="yellow">관망</b> — 전량 커버 완료. 107.50 저항 돌파 확인 후<br>
+      재진입 여부 판단. 5MA/20MA 위에서 단기 회복 구조.
+    </div>
+  </div>
+
+  <!-- KTB3 구조 분석 -->
+  <div class="section">
+    <h3>KTB3 시장구조</h3>
+    <div class="level-row"><span class="level-label">추세</span><span class="level-val red">하락 (4/28 고점 104.55 → 5/27 저점 102.63)</span></div>
+    <div class="level-row"><span class="level-label">현재 국면</span><span class="level-val yellow">기술적 반등 후 조정</span></div>
+    <div class="level-row"><span class="level-label">MA 배열</span><span class="level-val red">5MA≈20MA &lt; 60MA (역배열 유지)</span></div>
+    <div class="level-row"><span class="level-label">RSI(14)</span><span class="level-val yellow">~48 (중립)</span></div>
+    <div class="level-row"><span class="level-label">볼린저</span><span class="level-val gray">밴드 수축 → 변동성 축소 중</span></div>
+    <div class="level-row"><span class="level-label">핵심 이슈</span><span class="level-val red">6월물 만기 후 9월물로 롤오버</span></div>
+  </div>
+
+  <!-- KTB10 구조 분석 -->
+  <div class="section">
+    <h3>KTB10 시장구조</h3>
+    <div class="level-row"><span class="level-label">추세</span><span class="level-val red">하락 (4/28 고점 111.03 → 5/28 저점 105.22)</span></div>
+    <div class="level-row"><span class="level-label">현재 국면</span><span class="level-val yellow">데드캣 반등 구간 (105→107)</span></div>
+    <div class="level-row"><span class="level-label">MA 배열</span><span class="level-val red">5MA(106.74) &lt; 60MA(108.35) 역배열</span></div>
+    <div class="level-row"><span class="level-label">RSI(14)</span><span class="level-val yellow">~50 (중립 ~ 약한 회복)</span></div>
+    <div class="level-row"><span class="level-label">베어플래트닝</span><span class="level-val red">3년 -0.39pt vs 10년 -3.78pt (낙폭 10년 &gt;&gt; 3년)</span></div>
+    <div class="level-row"><span class="level-label">핵심 이슈</span><span class="level-val red">JGB 슈퍼롱 불안, FOMC 점도표</span></div>
+  </div>
+
+</div>
+
+<!-- 종합 의견 -->
+<div class="full-analysis">
+  <h3>종합 의견 (2026-06-18 기준)</h3>
+  <p>
+    <span class="key">매크로 환경:</span> NFP 서프라이즈(6/6) 이후 글로벌 금리 베어 기조 지속. 한국채권시장은 <span class="red">5회 인상 선반영</span> 상태로 펀더멘털 대비 과도한 할인.
+    FOMC 점도표(6/16~17) 결과와 BOJ 결정이 이번 주 핵심 변수. USD/KRW 1,600 접근에 따른 외인 KTB 매도 압력 상존.
+  </p>
+  <p>
+    <span class="key">KTB3 현황:</span> 잔여 숏 50계약(avg 103.6033)은 현재 +0.39pt 수익 구간. 102.77~103.55 박스권 형성 중.
+    103.55(진입avg) 돌파 시 손절 고려, 102.94 이탈 시 추가 하락 가속 가능. 6월물 만기 처리 완료(50계약), 9월물 전환 완료.
+  </p>
+  <p>
+    <span class="key">KTB10 현황:</span> 105.22 저점 → 107.25 반등 완성, 전량 커버 완료. 107.50 저항선이 관건.
+    FOMC 이후 방향 확인 후 재진입 여부 검토. 현재 5MA(106.74)/20MA(106.66) 위에서 유지 중.
+  </p>
+  <div class="verdict">
+    <div class="verdict-item">
+      <h4>KTB3 단기 (1~3일)</h4>
+      <p class="red">숏 50 유지. 103.55 돌파 시 손절/축소. 102.94 이탈 시 추가 수익 확보 준비.</p>
+    </div>
+    <div class="verdict-item">
+      <h4>KTB10 단기 (1~3일)</h4>
+      <p class="yellow">관망. FOMC 결과 확인 후 107.50 저항 돌파 시 재숏 검토. 급락 시 105.22 지지 확인.</p>
+    </div>
+    <div class="verdict-item">
+      <h4>리스크 요인</h4>
+      <p class="red">한국은행 단순매입 발표 / 채안펀드 발동 / FOMC 비둘기 서프라이즈 → 즉시 손절.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 데이터 ─────────────────────────────────────────────
+const ktb3Raw = [
+  {time:1773997200,open:103.62,high:103.77,low:103.26,close:103.26,volume:368236},
+  {time:1774256400,open:103.65,high:103.7,low:103.3,close:103.57,volume:421556},
+  {time:1774342800,open:103.7,high:103.84,low:103.46,close:103.5,volume:331977},
+  {time:1774429200,open:103.56,high:103.75,low:103.39,close:103.52,volume:402326},
+  {time:1774515600,open:103.41,high:103.45,low:103.29,close:103.37,volume:230109},
+  {time:1774602000,open:103.42,high:103.63,low:103.34,close:103.57,volume:200957},
+  {time:1774861200,open:103.62,high:103.7,low:103.46,close:103.52,volume:331077},
+  {time:1774947600,open:103.71,high:104.18,low:103.71,close:104.12,volume:308464},
+  {time:1775034000,open:104.01,high:104.17,low:103.72,close:103.8,volume:435532},
+  {time:1775120400,open:103.9,high:104.02,low:103.87,close:103.91,volume:158101},
+  {time:1775206800,open:103.82,high:104.08,low:103.78,close:104.03,volume:214491},
+  {time:1775466000,open:104.05,high:104.13,low:103.92,close:103.99,volume:248806},
+  {time:1775552400,open:104.45,high:104.53,low:104.35,close:104.43,volume:309223},
+  {time:1775638800,open:104.36,high:104.4,low:104.28,close:104.38,volume:221173},
+  {time:1775725200,open:104.43,high:104.55,low:104.24,close:104.29,volume:314049},
+  {time:1775811600,open:104.11,high:104.23,low:104.06,close:104.21,volume:166473},
+  {time:1776070800,open:104.37,high:104.41,low:104.31,close:104.35,volume:147798},
+  {time:1776157200,open:104.46,high:104.47,low:104.33,close:104.36,volume:190425},
+  {time:1776243600,open:104.4,high:104.44,low:104.31,close:104.32,volume:120286},
+  {time:1776330000,open:104.27,high:104.27,low:104.2,close:104.22,volume:98007},
+  {time:1776416400,open:104.26,high:104.4,low:104.22,close:104.32,volume:137397},
+  {time:1776675600,open:104.37,high:104.44,low:104.33,close:104.37,volume:140052},
+  {time:1776762000,open:104.29,high:104.37,low:104.24,close:104.27,volume:189911},
+  {time:1776848400,open:104.1,high:104.14,low:103.88,close:103.98,volume:273174},
+  {time:1776934800,open:103.95,high:104.02,low:103.82,close:103.84,volume:165563},
+  {time:1777021200,open:103.86,high:103.97,low:103.83,close:103.84,volume:149700},
+  {time:1777280400,open:103.84,high:103.88,low:103.66,close:103.74,volume:186060},
+  {time:1777366800,open:103.71,high:103.78,low:103.57,close:103.75,volume:190790},
+  {time:1777453200,open:103.51,high:103.64,low:103.49,close:103.53,volume:224677},
+  {time:1777626000,open:103.69,high:103.7,low:103.43,close:103.48,volume:176732},
+  {time:1777971600,open:103.48,high:103.6,low:103.3,close:103.58,volume:262779},
+  {time:1778058000,open:103.73,high:103.83,low:103.68,close:103.83,volume:168007},
+  {time:1778230800,open:103.67,high:103.7,low:103.39,close:103.66,volume:183882},
+  {time:1778490000,open:103.39,high:103.56,low:103.31,close:103.39,volume:218879},
+  {time:1778576400,open:103.51,high:103.58,low:103.38,close:103.51,volume:181922},
+  {time:1778662800,open:103.49,high:103.52,low:103.01,close:103.44,volume:254121},
+  {time:1778749200,open:103.13,high:103.22,low:102.94,close:103.13,volume:224364},
+  {time:1779094800,open:103.11,high:103.24,low:103.08,close:103.2,volume:196707},
+  {time:1779181200,open:103.11,high:103.22,low:103.02,close:103.18,volume:241371},
+  {time:1779267600,open:103.18,high:103.35,low:103.11,close:103.18,volume:171684},
+  {time:1779354000,open:103.18,high:103.3,low:103.13,close:103.3,volume:133303},
+  {time:1779440400,open:103.31,high:103.54,low:103.3,close:103.51,volume:178932},
+  {time:1779786000,open:103.5,high:103.56,low:103.36,close:103.36,volume:176396},
+  {time:1779872400,open:103.37,high:103.47,low:103.05,close:103.19,volume:396983},
+  {time:1779958800,open:103.25,high:103.37,low:103.21,close:103.33,volume:184268},
+  {time:1780045200,open:103.34,high:103.41,low:103.13,close:103.15,volume:183505},
+  {time:1780304400,open:103.16,high:103.26,low:102.97,close:103.22,volume:220675},
+  {time:1780390800,open:103.23,high:103.23,low:102.92,close:102.95,volume:189196},
+  {time:1780563600,open:102.95,high:103.05,low:102.88,close:102.9,volume:166799},
+  {time:1780650000,open:102.93,high:102.96,low:102.63,close:102.77,volume:259443},
+  {time:1780909200,open:102.78,high:103.07,low:102.74,close:103.01,volume:200420},
+  {time:1780995600,open:102.98,high:103.13,low:102.94,close:103.13,volume:168540},
+  {time:1781082000,open:103.17,high:103.2,low:103.05,close:103.07,volume:169196},
+  {time:1781168400,open:102.9,high:103.36,low:102.78,close:103.36,volume:176507},
+  {time:1781254800,open:103.38,high:103.63,low:103.32,close:103.55,volume:109426},
+  {time:1781514000,open:103.03,high:103.18,low:102.98,close:103.15,volume:181967},
+  {time:1781600400,open:103.18,high:103.23,low:103.05,close:103.21,volume:217068}
+];
+
+const ktb10Raw = [
+  {time:1773997200,open:109.15,high:109.53,low:108.51,close:108.51,volume:99864},
+  {time:1774256400,open:109.3,high:109.42,low:108.45,close:109.04,volume:113397},
+  {time:1774342800,open:109.45,high:109.64,low:108.75,close:108.82,volume:93425},
+  {time:1774429200,open:109.07,high:109.31,low:108.47,close:108.85,volume:113562},
+  {time:1774515600,open:108.65,high:108.68,low:108.15,close:108.17,volume:79282},
+  {time:1774602000,open:108.17,high:108.64,low:107.94,close:108.49,volume:81104},
+  {time:1774861200,open:108.65,high:108.94,low:108.44,close:108.6,volume:147343},
+  {time:1774947600,open:109.13,high:110.56,low:109.08,close:110.4,volume:119802},
+  {time:1775034000,open:110.1,high:110.45,low:109.3,close:109.42,volume:135817},
+  {time:1775120400,open:109.75,high:110.12,low:109.69,close:109.9,volume:62422},
+  {time:1775206800,open:109.7,high:110.33,low:109.54,close:110.1,volume:75736},
+  {time:1775466000,open:110.13,high:110.33,low:109.73,close:109.94,volume:91090},
+  {time:1775552400,open:111.14,high:111.4,low:110.75,close:111.03,volume:101089},
+  {time:1775638800,open:110.85,high:110.9,low:110.51,close:110.75,volume:83745},
+  {time:1775725200,open:110.91,high:111.1,low:110.4,close:110.53,volume:100545},
+  {time:1775811600,open:110.04,high:110.35,low:109.79,close:110.33,volume:99050},
+  {time:1776070800,open:110.8,high:110.97,low:110.61,close:110.89,volume:68733},
+  {time:1776157200,open:111.21,high:111.24,low:110.72,close:110.84,volume:77243},
+  {time:1776243600,open:110.9,high:110.94,low:110.56,close:110.67,volume:69780},
+  {time:1776330000,open:110.44,high:110.44,low:110.18,close:110.3,volume:50643},
+  {time:1776416400,open:110.4,high:110.82,low:110.35,close:110.6,volume:63129},
+  {time:1776675600,open:110.75,high:111.06,low:110.64,close:110.85,volume:73289},
+  {time:1776762000,open:110.65,high:110.76,low:110.47,close:110.47,volume:69129},
+  {time:1776848400,open:110.04,high:110.15,low:109.34,close:109.68,volume:113372},
+  {time:1776934800,open:109.59,high:109.74,low:109.34,close:109.4,volume:67806},
+  {time:1777021200,open:109.45,high:109.74,low:109.35,close:109.36,volume:63082},
+  {time:1777280400,open:109.36,high:109.4,low:108.81,close:108.96,volume:72997},
+  {time:1777366800,open:108.99,high:109.2,low:108.55,close:109.16,volume:83405},
+  {time:1777453200,open:108.59,high:108.88,low:108.26,close:108.5,volume:106453},
+  {time:1777626000,open:108.95,high:108.98,low:108.31,close:108.41,volume:69895},
+  {time:1777971600,open:108.39,high:108.51,low:107.92,close:108.45,volume:142738},
+  {time:1778058000,open:108.84,high:109.03,low:108.66,close:108.97,volume:80784},
+  {time:1778230800,open:108.34,high:108.45,low:107.43,close:108.34,volume:79091},
+  {time:1778490000,open:107.53,high:107.7,low:107.15,close:107.45,volume:103861},
+  {time:1778576400,open:107.53,high:107.8,low:107.11,close:107.51,volume:106209},
+  {time:1778662800,open:107.25,high:107.5,low:105.83,close:107.2,volume:117097},
+  {time:1778749200,open:105.45,high:106.33,low:105.42,close:106.15,volume:160027},
+  {time:1779094800,open:106.14,high:106.4,low:105.72,close:106.18,volume:134299},
+  {time:1779181200,open:106.14,high:106.39,low:105.57,close:106.31,volume:156478},
+  {time:1779267600,open:106.3,high:106.93,low:106.3,close:106.51,volume:111719},
+  {time:1779354000,open:106.59,high:106.99,low:106.1,close:106.99,volume:82235},
+  {time:1779440400,open:106.96,high:107.73,low:106.96,close:107.45,volume:82996},
+  {time:1779786000,open:107.55,high:107.64,low:107.11,close:107.11,volume:82647},
+  {time:1779872400,open:107.2,high:107.41,low:106.18,close:106.8,volume:143584},
+  {time:1779958800,open:107.03,high:107.57,low:107.03,close:107.5,volume:107138},
+  {time:1780045200,open:107.55,high:107.69,low:106.61,close:106.61,volume:85222},
+  {time:1780304400,open:106.73,high:107.29,low:106.21,close:107.09,volume:129472},
+  {time:1780390800,open:107.1,high:107.2,low:106.2,close:106.31,volume:97080},
+  {time:1780563600,open:105.93,high:106.69,low:105.9,close:106.1,volume:93974},
+  {time:1780650000,open:106.1,high:106.2,low:105.26,close:105.45,volume:108313},
+  {time:1780909200,open:105.55,high:106.12,low:105.22,close:105.95,volume:95936},
+  {time:1780995600,open:105.83,high:106.1,low:105.53,close:106.1,volume:84682},
+  {time:1781082000,open:106,high:106.34,low:105.66,close:105.66,volume:92261},
+  {time:1781168400,open:105.75,high:106.74,low:105.53,close:106.71,volume:90869},
+  {time:1781254800,open:106.67,high:107.55,low:106.51,close:107.22,volume:65968},
+  {time:1781514000,open:106.83,high:106.99,low:106.42,close:106.85,volume:100180},
+  {time:1781600400,open:106.9,high:107.27,low:106.82,close:107.25,volume:97439}
+];
+
+// ── 날짜 변환 ──────────────────────────────────────────
+function toDateStr(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+}
+function toCandle(r) { return { time: toDateStr(r.time), open:r.open, high:r.high, low:r.low, close:r.close }; }
+function toVol(r)    { return { time: toDateStr(r.time), value:r.volume, color: r.close>=r.open?'#3fb95040':'#f8514940' }; }
+
+// ── MA 계산 ────────────────────────────────────────────
+function calcMA(data, period) {
+  return data.map((d, i) => {
+    if (i < period - 1) return null;
+    const sum = data.slice(i - period + 1, i + 1).reduce((s, v) => s + v.close, 0);
+    return { time: toDateStr(d.time), value: Math.round(sum / period * 100) / 100 };
+  }).filter(Boolean);
+}
+
+// ── 차트 생성 함수 ─────────────────────────────────────
+function makeChart(elId, rawData, levels, ohlcId, symbol) {
+  const el = document.getElementById(elId);
+  const chart = LightweightCharts.createChart(el, {
+    width: el.clientWidth,
+    height: 340,
+    layout: { background: { color: '#0d1117' }, textColor: '#8b949e' },
+    grid: { vertLines: { color: '#21262d' }, horzLines: { color: '#21262d' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#30363d', scaleMargins: { top: 0.1, bottom: 0.25 } },
+    timeScale: { borderColor: '#30363d', timeVisible: true },
+  });
+
+  // 캔들
+  const cs = chart.addCandlestickSeries({
+    upColor:'#3fb950', downColor:'#f85149',
+    borderUpColor:'#3fb950', borderDownColor:'#f85149',
+    wickUpColor:'#3fb950', wickDownColor:'#f85149',
+  });
+  cs.setData(rawData.map(toCandle));
+
+  // MA5
+  const ma5 = chart.addLineSeries({ color:'#f0883e', lineWidth:1, title:'MA5' });
+  ma5.setData(calcMA(rawData, 5));
+
+  // MA20
+  const ma20 = chart.addLineSeries({ color:'#58a6ff', lineWidth:1, title:'MA20' });
+  ma20.setData(calcMA(rawData, 20));
+
+  // MA60
+  const ma60 = chart.addLineSeries({ color:'#d29922', lineWidth:1, title:'MA60' });
+  ma60.setData(calcMA(rawData, 60));
+
+  // 볼륨
+  const volSeries = chart.addHistogramSeries({
+    priceFormat: { type: 'volume' },
+    priceScaleId: 'vol',
+    scaleMargins: { top: 0.8, bottom: 0 },
+  });
+  volSeries.setData(rawData.map(toVol));
+
+  // 수평선 레벨
+  levels.forEach(lv => {
+    const ls = chart.addLineSeries({
+      color: lv.color, lineWidth: 1, lineStyle: 2,
+      priceLabel: true, lastValueVisible: true,
+      title: lv.label,
+    });
+    const first = toDateStr(rawData[0].time);
+    const last  = toDateStr(rawData[rawData.length-1].time);
+    ls.setData([{ time: first, value: lv.price }, { time: last, value: lv.price }]);
+  });
+
+  // crosshair OHLC 표시
+  chart.subscribeCrosshairMove(p => {
+    if (p.seriesData.size > 0) {
+      const v = p.seriesData.get(cs);
+      if (v) {
+        const dir = v.close >= v.open ? '#3fb950' : '#f85149';
+        document.getElementById(ohlcId).innerHTML =
+          `<span>O <b>${v.open}</b></span> &nbsp;
+           <span>H <b>${v.high}</b></span> &nbsp;
+           <span>L <b>${v.low}</b></span> &nbsp;
+           <span style="color:${dir}">C <b>${v.close}</b></span>`;
+      }
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    chart.applyOptions({ width: el.clientWidth });
+  });
+
+  chart.timeScale().fitContent();
+  return chart;
+}
+
+// ── 차트 렌더링 ────────────────────────────────────────
+window.addEventListener('load', () => {
+  makeChart('chart3', ktb3Raw, [
+    { price:103.6033, color:'#f85149', label:'진입avg 103.60' },
+    { price:103.55,   color:'#f8514980', label:'저항 103.55' },
+    { price:102.94,   color:'#d29922',   label:'지지 102.94' },
+    { price:102.77,   color:'#d2992280', label:'저점 102.77' },
+    { price:102.70,   color:'#f85149',   label:'손절 102.70' },
+  ], 'ohlc3', 'BM31!');
+
+  makeChart('chart10', ktb10Raw, [
+    { price:107.50,   color:'#f85149',   label:'저항 107.50' },
+    { price:106.66,   color:'#d29922',   label:'20MA 106.66' },
+    { price:105.42,   color:'#f8514980', label:'지지 105.42' },
+    { price:105.22,   color:'#f85149',   label:'저점 105.22' },
+  ], 'ohlc10', 'BMA1!');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>KTB 데일리 트레이딩 저널 | 2026-06-18</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d1117; color:#e6edf3; font-family:'Malgun Gothic',sans-serif; font-size:13px; }
+.header { background:#161b22; border-bottom:1px solid #30363d; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; }
+.header h1 { font-size:18px; font-weight:700; color:#f0f6fc; }
+.header .date { color:#8b949e; font-size:12px; margin-top:3px; }
+.pos-bar { display:flex; gap:12px; padding:12px 24px; background:#0d1117; border-bottom:1px solid #21262d; }
+.pos-card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px 16px; flex:1; }
+.pos-card.short  { border-left:3px solid #f85149; }
+.pos-card.profit { border-left:3px solid #3fb950; }
+.pos-card.loss   { border-left:3px solid #f85149; }
+.pos-card.flat   { border-left:3px solid #8b949e; }
+.pos-card h3 { font-size:11px; color:#8b949e; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.pos-card .val { font-size:18px; font-weight:700; }
+.pos-card .sub { font-size:11px; color:#8b949e; margin-top:3px; }
+.red    { color:#f85149; }
+.green  { color:#3fb950; }
+.gray   { color:#8b949e; }
+.yellow { color:#d29922; }
+.badge  { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.badge.s { background:#f8514920; color:#f85149; }
+.badge.b { background:#3fb95020; color:#3fb950; }
+.badge.n { background:#d2992220; color:#d29922; }
+
+/* 차트 스크린샷 */
+.charts-row { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#21262d; }
+.chart-wrap { background:#0d1117; }
+.chart-header { padding:10px 16px; background:#161b22; border-bottom:1px solid #21262d; display:flex; align-items:center; justify-content:space-between; }
+.chart-header h2 { font-size:14px; font-weight:600; }
+.chart-header .tf { font-size:11px; color:#8b949e; background:#21262d; padding:2px 7px; border-radius:4px; }
+.chart-img { width:100%; display:block; background:#0d1117; }
+
+/* 거래내역 */
+.trades-section { padding:20px 24px; }
+.trades-section h2 { font-size:13px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid #21262d; }
+.trades-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.trade-table-wrap { background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden; }
+.trade-table-wrap h3 { font-size:12px; padding:10px 14px; background:#0d1117; border-bottom:1px solid #21262d; color:#8b949e; }
+table.tlog { width:100%; border-collapse:collapse; }
+table.tlog th { padding:7px 10px; background:#0d1117; color:#8b949e; font-size:11px; font-weight:600; text-align:left; border-bottom:1px solid #21262d; }
+table.tlog td { padding:6px 10px; border-bottom:1px solid #21262d11; font-size:12px; }
+table.tlog tr:last-child td { border:none; }
+table.tlog td.sell { color:#f85149; font-weight:600; }
+table.tlog td.buy  { color:#3fb950; font-weight:600; }
+table.tlog td.right { text-align:right; }
+.tlog-footer { padding:8px 14px; background:#0d1117; border-top:1px solid #21262d; font-size:12px; display:flex; justify-content:space-between; }
+
+/* FIFO 라운드트립 */
+.roundtrip-section { padding:0 24px 20px; }
+.roundtrip-section h2 { font-size:13px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid #21262d; }
+table.rtable { width:100%; border-collapse:collapse; background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden; }
+table.rtable th { padding:8px 10px; background:#0d1117; color:#8b949e; font-size:11px; text-align:left; border-bottom:1px solid #21262d; }
+table.rtable td { padding:6px 10px; border-bottom:1px solid #21262d22; font-size:12px; }
+table.rtable tr:last-child td { border:none; }
+table.rtable .win  { color:#3fb950; font-weight:600; }
+table.rtable .loss { color:#f85149; font-weight:600; }
+
+/* 분석 섹션 */
+.analysis { padding:0 24px 20px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.section { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px 16px; }
+.section h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #21262d; }
+.level-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #21262d22; }
+.level-row:last-child { border:none; }
+.level-label { color:#8b949e; font-size:12px; }
+.level-val { font-size:13px; font-weight:600; }
+.signal-box { padding:8px 12px; border-radius:6px; margin-top:8px; font-size:12px; line-height:1.7; }
+.signal-box.bearish { background:#f8514910; border:1px solid #f8514930; }
+.signal-box.neutral { background:#d2992210; border:1px solid #d2992230; }
+.full-analysis { margin:0 24px 24px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px 20px; }
+.full-analysis h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px; }
+.full-analysis p { font-size:13px; line-height:1.8; color:#c9d1d9; margin-bottom:8px; }
+.full-analysis p span.key { color:#e6edf3; font-weight:600; }
+.verdict { display:flex; gap:12px; margin-top:12px; }
+.verdict-item { flex:1; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; }
+.verdict-item h4 { font-size:11px; color:#8b949e; margin-bottom:4px; }
+.verdict-item p { font-size:12px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+  <div>
+    <h1>KTB 데일리 트레이딩 저널</h1>
+    <div class="date">2026-06-18 (수) &nbsp;|&nbsp; KTB3년물 · KTB10년물 &nbsp;|&nbsp; 5분봉 기준</div>
+  </div>
+  <div class="badge s">베어마켓 구간</div>
+</div>
+
+<!-- 포지션 요약 바 -->
+<div class="pos-bar">
+  <div class="pos-card short">
+    <h3>KTB3 잔여 포지션</h3>
+    <div class="val red">SHORT ~165계약</div>
+    <div class="sub">진입avg 103.14 부근 | 장마감 103.03 | +0.11pt</div>
+  </div>
+  <div class="pos-card flat">
+    <h3>KTB10 포지션</h3>
+    <div class="val gray">FLAT (전량 정리)</div>
+    <div class="sub">일중 롱/숏 트레이딩 후 장마감 청산 완료</div>
+  </div>
+  <div class="pos-card profit">
+    <h3>6/18 실현 손익 (KTB3)</h3>
+    <div class="val green">+20,220,000원</div>
+    <div class="sub">삼성선물 SS + NH선물 NH 합산</div>
+  </div>
+  <div class="pos-card loss">
+    <h3>6/18 실현 손익 (KTB10)</h3>
+    <div class="val red">-2,580,000원</div>
+    <div class="sub">롱 진입 후 장마감 손절 (NH선물)</div>
+  </div>
+</div>
+
+<!-- TradingView 5분봉 스크린샷 -->
+<div class="charts-row">
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <h2>KRX:BM31! &nbsp;<span class="gray">KTB3년물 선물</span></h2>
+      <span class="tf">5분봉 &nbsp;2026-06-18</span>
+    </div>
+    <img class="chart-img" src="file:///C:/Users/iamju/tradingview-mcp-aibridge/screenshots/ktb3_20260618_trades.png" alt="KTB3 5min chart 2026-06-18">
+  </div>
+  <div class="chart-wrap">
+    <div class="chart-header">
+      <h2>KRX:BMA1! &nbsp;<span class="gray">KTB10년물 선물</span></h2>
+      <span class="tf">5분봉 &nbsp;2026-06-18</span>
+    </div>
+    <img class="chart-img" src="file:///C:/Users/iamju/tradingview-mcp-aibridge/screenshots/ktb10_20260618_trades.png" alt="KTB10 5min chart 2026-06-18">
+  </div>
+</div>
+
+<!-- 거래 체결 내역 -->
+<div class="trades-section">
+  <h2>체결 내역 (2026-06-18)</h2>
+  <div class="trades-grid">
+
+    <!-- KTB3 -->
+    <div class="trade-table-wrap">
+      <h3>KTB3년물 (A6569 / A6569000)</h3>
+      <table class="tlog">
+        <thead>
+          <tr><th>시각</th><th>방향</th><th>수량</th><th>체결가</th><th>증권사</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>08:59</td><td class="sell">▼ 매도</td><td>15</td><td>103.19</td><td class="gray">NH</td></tr>
+          <tr><td>12:50</td><td class="sell">▼ 매도</td><td>50</td><td>103.19</td><td class="gray">SS</td></tr>
+          <tr><td>13:12</td><td class="buy">▲ 매수</td><td>30</td><td>103.10</td><td class="gray">SS</td></tr>
+          <tr><td>14:22</td><td class="sell">▼ 매도</td><td>50</td><td>103.11</td><td class="gray">SS</td></tr>
+          <tr><td>14:34</td><td class="sell">▼ 매도</td><td>50</td><td>103.12</td><td class="gray">SS</td></tr>
+          <tr><td>15:00</td><td class="buy">▲ 매수</td><td>30</td><td>103.08</td><td class="gray">SS</td></tr>
+          <tr><td>15:23</td><td class="buy">▲ 매수</td><td>30</td><td>103.09</td><td class="gray">SS</td></tr>
+          <tr><td>15:27</td><td class="buy">▲ 매수</td><td>30</td><td>103.06</td><td class="gray">SS</td></tr>
+          <tr><td>15:34</td><td class="buy">▲ 매수</td><td>45</td><td>103.05</td><td class="gray">NH</td></tr>
+          <tr><td>15:45</td><td class="buy">▲ 매수</td><td>45</td><td>103.03</td><td class="gray">NH</td></tr>
+        </tbody>
+      </table>
+      <div class="tlog-footer">
+        <span class="gray">매도 합계: <span class="red">165계약</span> &nbsp;|&nbsp; 매수 합계: <span class="green">180계약</span></span>
+        <span>실현 손익: <span class="green">+20,220,000원</span></span>
+      </div>
+    </div>
+
+    <!-- KTB10 -->
+    <div class="trade-table-wrap">
+      <h3>KTB10년물 (A6769 / A6769000)</h3>
+      <table class="tlog">
+        <thead>
+          <tr><th>시각</th><th>방향</th><th>수량</th><th>체결가</th><th>증권사</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>09:10</td><td class="buy">▲ 매수</td><td>10</td><td>107.01</td><td class="gray">NH</td></tr>
+          <tr><td>09:16</td><td class="buy">▲ 매수</td><td>20</td><td>106.95</td><td class="gray">NH</td></tr>
+          <tr><td>09:19</td><td class="sell">▼ 매도</td><td>30</td><td>106.94</td><td class="gray">SS</td></tr>
+          <tr><td>10:44</td><td class="sell">▼ 매도</td><td>30</td><td>107.05</td><td class="gray">SS</td></tr>
+          <tr><td>11:08</td><td class="buy">▲ 매수</td><td>20</td><td>106.92</td><td class="gray">SS</td></tr>
+          <tr><td>14:47</td><td class="sell">▼ 매도</td><td>20</td><td>106.98</td><td class="gray">SS</td></tr>
+          <tr><td>14:56</td><td class="sell">▼ 매도</td><td>20</td><td>106.86</td><td class="gray">SS</td></tr>
+          <tr><td>15:45</td><td class="sell">▼ 매도</td><td>30</td><td>106.74</td><td class="gray">NH</td></tr>
+        </tbody>
+      </table>
+      <div class="tlog-footer">
+        <span class="gray">매수 합계: <span class="green">50계약</span> &nbsp;|&nbsp; 매도 합계: <span class="red">100계약</span></span>
+        <span>실현 손익: <span class="red">-2,580,000원</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FIFO 라운드트립 -->
+<div class="roundtrip-section">
+  <h2>FIFO 매칭 라운드트립 (청산일 기준 2026-06-18)</h2>
+  <table class="rtable">
+    <thead>
+      <tr>
+        <th>종목</th><th>진입방향</th><th>수량</th>
+        <th>진입가</th><th>진입시각</th>
+        <th>청산가</th><th>청산시각</th>
+        <th>보유(분)</th><th>순손익</th><th>결과</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>A6769</td><td>매도</td><td>20</td><td>106.94</td><td>09:19</td><td>106.92</td><td>11:08</td><td>109</td><td class="win">+360,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>30</td><td>103.19</td><td>12:50</td><td>103.10</td><td>13:12</td><td class="gray">1462</td><td class="win">+2,640,000</td><td class="win">익절</td></tr>
+      <tr><td>A6769</td><td>매도</td><td>10</td><td>106.94</td><td>09:19</td><td>106.98</td><td>14:47</td><td>328</td><td class="loss">-420,000</td><td class="loss">손절</td></tr>
+      <tr><td>A6769</td><td>매도</td><td>10</td><td>107.05</td><td>10:44</td><td>106.98</td><td>14:47</td><td>243</td><td class="win">+680,000</td><td class="win">익절</td></tr>
+      <tr><td>A6769</td><td>매도</td><td>20</td><td>107.05</td><td>10:44</td><td>106.86</td><td>14:56</td><td>252</td><td class="win">+3,760,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>20</td><td>103.19</td><td>12:50</td><td>103.08</td><td>15:00</td><td class="gray">1570</td><td class="win">+2,160,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>10</td><td>103.11</td><td>14:22</td><td>103.08</td><td>15:00</td><td class="gray">1478</td><td class="win">+280,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>30</td><td>103.11</td><td>14:22</td><td>103.09</td><td>15:23</td><td class="gray">1501</td><td class="win">+540,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>10</td><td>103.11</td><td>14:22</td><td>103.06</td><td>15:27</td><td class="gray">1505</td><td class="win">+480,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>20</td><td>103.12</td><td>14:34</td><td>103.06</td><td>15:27</td><td class="gray">1493</td><td class="win">+1,160,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569000</td><td>매도</td><td>45</td><td>103.15</td><td>15:45*</td><td>103.05</td><td>15:34</td><td class="gray">2869</td><td class="win">+4,410,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569</td><td>매도</td><td>30</td><td>103.12</td><td>14:34</td><td>103.03</td><td>15:45</td><td class="gray">1511</td><td class="win">+2,640,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569000</td><td>매도</td><td>30</td><td>103.15</td><td>15:45*</td><td>103.03</td><td>15:45</td><td class="gray">2880</td><td class="win">+3,540,000</td><td class="win">익절</td></tr>
+      <tr><td>A6569000</td><td>매도</td><td>15</td><td>103.19</td><td>08:59*</td><td>103.03</td><td>15:45</td><td class="gray">1846</td><td class="win">+2,370,000</td><td class="win">익절</td></tr>
+      <tr><td>A6769000</td><td>매수</td><td>10</td><td>107.01</td><td>09:10</td><td>106.74</td><td>15:45</td><td>1835</td><td class="loss">-2,720,000</td><td class="loss">손절</td></tr>
+      <tr><td>A6769000</td><td>매수</td><td>20</td><td>106.95</td><td>09:16</td><td>106.74</td><td>15:45</td><td>1829</td><td class="loss">-4,240,000</td><td class="loss">손절</td></tr>
+    </tbody>
+    <tfoot>
+      <tr style="background:#0d1117">
+        <td colspan="8" style="padding:8px 10px; color:#8b949e; font-size:11px">* 진입시각은 이전일(6/16~6/17) 포지션의 체결시각 (FIFO 기준)</td>
+        <td colspan="2" style="padding:8px 10px; font-weight:700; color:#3fb950">합계: +17,640,000원</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<!-- 기술적 분석 -->
+<div class="analysis">
+  <div class="section">
+    <h3>KTB3 주요 레벨 (6/18 종가 기준)</h3>
+    <div class="level-row"><span class="level-label">당일 고점</span><span class="level-val red">103.21</span></div>
+    <div class="level-row"><span class="level-label">당일 저점</span><span class="level-val green">103.03</span></div>
+    <div class="level-row"><span class="level-label">일중 숏 진입대</span><span class="level-val red">103.11 ~ 103.19</span></div>
+    <div class="level-row"><span class="level-label">일중 커버대</span><span class="level-val green">103.03 ~ 103.10</span></div>
+    <div class="level-row"><span class="level-label">장마감 잔여 진입avg</span><span class="level-val yellow">~103.14</span></div>
+    <div class="level-row"><span class="level-label">저항 (전일 진입avg)</span><span class="level-val red">103.6033</span></div>
+    <div class="level-row"><span class="level-label">지지 (5/29 저점)</span><span class="level-val yellow">102.94</span></div>
+    <div class="level-row"><span class="level-label">손절라인</span><span class="level-val red">102.70</span></div>
+    <div class="signal-box bearish" style="margin-top:10px">
+      <b class="red">숏 유지</b> — 일중 103.19 진입 → 103.03 커버로 +0.16pt 수익 확보.<br>
+      장마감 잔여 숏 보유, 추가 하락 시 102.94 지지 테스트 주목.
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>KTB10 주요 레벨 (6/18 종가 기준)</h3>
+    <div class="level-row"><span class="level-label">당일 고점</span><span class="level-val red">107.05</span></div>
+    <div class="level-row"><span class="level-label">당일 저점</span><span class="level-val green">106.74</span></div>
+    <div class="level-row"><span class="level-label">SS 숏 진입대</span><span class="level-val red">106.94 ~ 107.05</span></div>
+    <div class="level-row"><span class="level-label">NH 롱 진입대</span><span class="level-val green">106.95 ~ 107.01</span></div>
+    <div class="level-row"><span class="level-label">NH 롱 손절 청산</span><span class="level-val red">106.74 (15:45)</span></div>
+    <div class="level-row"><span class="level-label">저항 (5월 고점대)</span><span class="level-val red">107.50 ~ 107.60</span></div>
+    <div class="level-row"><span class="level-label">지지 (20MA)</span><span class="level-val yellow">106.66</span></div>
+    <div class="level-row"><span class="level-label">핵심 지지</span><span class="level-val red">105.42</span></div>
+    <div class="signal-box neutral" style="margin-top:10px">
+      <b class="yellow">혼조</b> — SS 숏(106.94~107.05 진입)은 부분 익절 성공,<br>
+      NH 롱(107.01 진입)은 106.74에서 손절로 -6,960,000원 발생.
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>KTB3 일중 흐름 분석</h3>
+    <div class="level-row"><span class="level-label">오전 초반</span><span class="level-val gray">소량 숏 선취 (NH 15계약 @103.19)</span></div>
+    <div class="level-row"><span class="level-label">오후 초반</span><span class="level-val red">103.19 저항 재확인 후 SS 대량 숏 진입 (50계약)</span></div>
+    <div class="level-row"><span class="level-label">13:12</span><span class="level-val green">1차 커버 30계약 @103.10 (+0.09pt)</span></div>
+    <div class="level-row"><span class="level-label">14:22~14:34</span><span class="level-val red">103.11~103.12 추가 숏 100계약</span></div>
+    <div class="level-row"><span class="level-label">15:00~15:45</span><span class="level-val green">전량 스캘핑 청산 103.03~103.09</span></div>
+    <div class="level-row"><span class="level-label">종합 결과</span><span class="level-val yellow">일중 스윙 숏 +0.08~0.16pt 수익 구간</span></div>
+  </div>
+
+  <div class="section">
+    <h3>KTB10 일중 흐름 분석</h3>
+    <div class="level-row"><span class="level-label">09:10~09:19</span><span class="level-val gray">NH 롱 30계약 vs SS 숏 30계약 교차</span></div>
+    <div class="level-row"><span class="level-label">10:44</span><span class="level-val red">107.05 고점권 SS 숏 30계약 추가</span></div>
+    <div class="level-row"><span class="level-label">11:08</span><span class="level-val green">SS 단기 커버 20계약 @106.92 (+0.02pt)</span></div>
+    <div class="level-row"><span class="level-label">14:47~14:56</span><span class="level-val green">SS 잔여 숏 청산 106.86~106.98</span></div>
+    <div class="level-row"><span class="level-label">15:45</span><span class="level-val red">NH 롱 전량 손절 @106.74 (-0.21~0.27pt)</span></div>
+    <div class="level-row"><span class="level-label">종합 결과</span><span class="level-val red">SS 숏 수익 +4,400,000 / NH 롱 손실 -6,960,000</span></div>
+  </div>
+</div>
+
+<!-- 종합 의견 -->
+<div class="full-analysis">
+  <h3>종합 의견 (2026-06-18 마감)</h3>
+  <p>
+    <span class="key">당일 총 실현 손익:</span> KTB3 <span class="green">+20,220,000원</span> + KTB10 <span class="red">-2,580,000원</span> = <span class="green" style="font-size:15px;font-weight:700">합계 +17,640,000원</span>
+  </p>
+  <p>
+    <span class="key">KTB3 평가:</span> 103.19 저항권 공략 숏이 유효했음. 일중 고점 103.21 확인 후 재하락, 103.03까지 ▼0.18pt 하락 구간에서
+    스캘핑 청산 성공. NH선물의 전일 이월 포지션(A6569000) FIFO 청산도 +0.10~0.16pt 수익 기여.
+    잔여 숏포지션은 내일 추가 하락 가능성에 베팅 상태 유지.
+  </p>
+  <p>
+    <span class="key">KTB10 평가:</span> SS 숏(107.05 진입)은 106.86~106.98 커버로 성공적이나, NH 롱(107.01 진입 30계약)이
+    106.74 장마감 손절로 -6,960,000원 손실 발생. 전체 KTB10 손익은 <span class="red">-2,580,000원</span>으로 마감.
+    107.50 저항선을 돌파하지 못한 것이 손실 원인. 내일 방향성 주시 필요.
+  </p>
+  <div class="verdict">
+    <div class="verdict-item">
+      <h4>KTB3 익일 전략</h4>
+      <p class="red">잔여 숏 유지. 103.20 돌파 시 일부 축소 검토. 102.94 이탈 시 추가 숏 확대 또는 이익 실현.</p>
+    </div>
+    <div class="verdict-item">
+      <h4>KTB10 익일 전략</h4>
+      <p class="yellow">관망. 107.00 돌파 확인 후 소량 롱 재진입 여부 검토. 106.50 이탈 시 숏 방향 전환.</p>
+    </div>
+    <div class="verdict-item">
+      <h4>리스크 모니터링</h4>
+      <p class="red">한국은행 긴급 발표 / 외인 대규모 KTB 매수 / USD/KRW 급락 → 즉시 포지션 재검토.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,45 @@
+# OAuth 인증정보 (절대 커밋 금지)
+gmail_token.json
+gmail_credentials.json
+trading_journal/config/token.json
+trading_journal/config/credentials.json.json
+trading_journal/config/credentials.json
+
+# 개인 거래 데이터
+settlements/
+trading_journal/data/
+trading_journal/output/
+trading_journal/logs/
+parsed_*.json
+trading_db.xlsx
+
+# 스크린샷 (로컬 TV 경로 의존)
+tradingview-mcp/screenshots/
+*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Excel 개인파일
+infomax/
+시계열/
+*.xlsx
+*.xls
+
+# 로그
+*.log
+last_run.txt
+refresh_log.txt
+
+# 기타
+.DS_Store
+Thumbs.db
