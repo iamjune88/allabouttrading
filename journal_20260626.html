@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>KTB 데일리 트레이딩 저널 | 2026-06-26</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d1117; color:#e6edf3; font-family:'Malgun Gothic',sans-serif; font-size:13px; }
+.header { background:#161b22; border-bottom:1px solid #30363d; padding:16px 24px; display:flex; align-items:center; justify-content:space-between; }
+.header h1 { font-size:18px; font-weight:700; color:#f0f6fc; }
+.header .date { color:#8b949e; font-size:12px; margin-top:3px; }
+.pos-bar { display:flex; gap:12px; padding:12px 24px; background:#0d1117; border-bottom:1px solid #21262d; }
+.pos-card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:12px 16px; flex:1; }
+.pos-card.short  { border-left:3px solid #f85149; }
+.pos-card.profit { border-left:3px solid #3fb950; }
+.pos-card.loss   { border-left:3px solid #f85149; }
+.pos-card.flat   { border-left:3px solid #8b949e; }
+.pos-card h3 { font-size:11px; color:#8b949e; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.pos-card .val { font-size:17px; font-weight:700; }
+.pos-card .sub { font-size:11px; color:#8b949e; margin-top:3px; }
+.red    { color:#f85149; }
+.green  { color:#3fb950; }
+.gray   { color:#8b949e; }
+.yellow { color:#d29922; }
+.badge  { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.badge.s { background:#f8514920; color:#f85149; }
+.badge.b { background:#3fb95020; color:#3fb950; }
+.badge.n { background:#d2992220; color:#d29922; }
+
+.charts-row { display:grid; grid-template-columns:1fr; gap:1px; background:#21262d; }
+.chart-wrap { background:#0d1117; }
+.chart-header { padding:10px 16px; background:#161b22; border-bottom:1px solid #21262d; display:flex; align-items:center; justify-content:space-between; }
+.chart-header h2 { font-size:14px; font-weight:600; }
+.chart-header .tf { font-size:11px; color:#8b949e; background:#21262d; padding:2px 7px; border-radius:4px; }
+.chart-img { width:100%; display:block; background:#0d1117; }
+.chart-note { padding:8px 16px; font-size:11px; color:#8b949e; background:#0d1117; }
+
+.trades-section { padding:20px 24px; }
+.trades-section h2 { font-size:13px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid #21262d; }
+.trade-table-wrap { background:#161b22; border:1px solid #30363d; border-radius:8px; overflow:hidden; }
+.trade-table-wrap h3 { font-size:12px; padding:10px 14px; background:#0d1117; border-bottom:1px solid #21262d; color:#8b949e; }
+table.tlog { width:100%; border-collapse:collapse; }
+table.tlog th { padding:7px 10px; background:#0d1117; color:#8b949e; font-size:11px; font-weight:600; text-align:left; border-bottom:1px solid #21262d; }
+table.tlog td { padding:6px 10px; border-bottom:1px solid #21262d11; font-size:12px; }
+table.tlog tr:last-child td { border:none; }
+table.tlog td.sell { color:#f85149; font-weight:600; }
+table.tlog td.buy  { color:#3fb950; font-weight:600; }
+table.tlog td.right { text-align:right; }
+.tlog-footer { padding:8px 14px; background:#0d1117; border-top:1px solid #21262d; font-size:12px; display:flex; justify-content:space-between; }
+
+.analysis { padding:0 24px 20px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.section { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:14px 16px; }
+.section h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #21262d; }
+.level-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid #21262d22; }
+.level-row:last-child { border:none; }
+.level-label { color:#8b949e; font-size:12px; }
+.level-val { font-size:13px; font-weight:600; }
+.signal-box { padding:8px 12px; border-radius:6px; margin-top:8px; font-size:12px; line-height:1.7; }
+.signal-box.bearish { background:#f8514910; border:1px solid #f8514930; }
+.signal-box.neutral { background:#d2992210; border:1px solid #d2992230; }
+.signal-box.bullish { background:#3fb95010; border:1px solid #3fb95030; }
+
+.comment-wrap { margin:0 24px 24px; background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px 20px; }
+.comment-wrap h3 { font-size:12px; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; }
+.comment-box { min-height:140px; background:#0d1117; border:1px dashed #30363d; border-radius:6px; padding:12px 14px; font-size:13px; line-height:1.8; color:#e6edf3; outline:none; }
+.comment-box:empty:before { content:"여기에 클릭해서 오늘 트레이딩에 대한 코멘트를 직접 입력하세요."; color:#6e7681; }
+.comment-box:focus { border-color:#58a6ff; }
+
+.footer-note { padding:16px 24px 28px; font-size:11px; color:#6e7681; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>KTB 데일리 트레이딩 저널</h1>
+    <div class="date">2026-06-26 (금) &nbsp;|&nbsp; KTB10년물 &nbsp;|&nbsp; 5분봉 기준</div>
+  </div>
+  <div class="badge n">당일 매수/매도 균형 (350/350) — 순증감 없음</div>
+</div>
+
+<div class="pos-bar">
+  <div class="pos-card flat">
+    <h3>KTB10 당일 포지션 변동</h3>
+    <div class="val gray">순증감 0계약</div>
+    <div class="sub">매수 350 / 매도 350 — 당일 내 매매만, 기존 잔여 포지션 변동 없음</div>
+  </div>
+  <div class="pos-card loss">
+    <h3>6/26 KTB10 정산차금</h3>
+    <div class="val red">-46,500,000원</div>
+    <div class="sub">수수료 700,000원 별도 (NH선물 기준)</div>
+  </div>
+  <div class="pos-card">
+    <h3>체결 평균가</h3>
+    <div class="val">BUY 106.86 / SELL 106.73</div>
+    <div class="sub">BUY avg가 SELL avg보다 0.13pt 높음 — 당일 손실 원인</div>
+  </div>
+  <div class="pos-card">
+    <h3>체결시간 입력 방식</h3>
+    <div class="val yellow">수기 입력</div>
+    <div class="sub">NH 메일이 정정포함(02A101) 변형만 발송돼 체결시간 누락 — 사용자가 직접 13건 입력</div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="chart-wrap">
+    <div class="chart-header"><h2>KTB10 Futures · KRX:BMA1!</h2><span class="tf">5m · 08:45–15:45</span></div>
+    <img class="chart-img" src="journal_assets/ktb10_20260626.png" alt="KTB10 chart">
+    <div class="chart-note">▲ BUY 6건 / ▼ SELL 7건 + BUY/SELL avg선 + SMA20·SMA60(후반부)·VWAP·RSI(14)·VRVP(당일) · OHLCV 직접 렌더링(matplotlib), 우측 17:30까지 여백 확보 · SMA120/200은 가용 봉수(102봉) 부족으로 시계열 대신 TV 현재값 스냅샷 점선 · VWAP/RSI는 세션 앵커·웜업 차이로 TV 범례 표시값과 소폭 다를 수 있음(자체 계산값 기준)</div>
+  </div>
+</div>
+
+<div class="trades-section">
+  <h2>체결내역 (A6769 · KTB10년물, 시간순)</h2>
+  <div class="trade-table-wrap">
+    <table class="tlog">
+      <tr><th>시간</th><th>구분</th><th class="right">수량</th><th class="right">가격</th><th class="right">손익</th><th class="right">수수료</th></tr>
+      <tr><td>09:09</td><td class="buy">BUY</td><td class="right">50</td><td class="right">106.67</td><td class="right green">+15,500,000</td><td class="right">50,000</td></tr>
+      <tr><td>09:11</td><td class="buy">BUY</td><td class="right">50</td><td class="right">106.62</td><td class="right green">+18,000,000</td><td class="right">50,000</td></tr>
+      <tr><td>09:26</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.66</td><td class="right red">-16,000,000</td><td class="right">50,000</td></tr>
+      <tr><td>10:38</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.55</td><td class="right red">-21,500,000</td><td class="right">50,000</td></tr>
+      <tr><td>10:46</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.58</td><td class="right red">-20,000,000</td><td class="right">50,000</td></tr>
+      <tr><td>10:52</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.64</td><td class="right red">-17,000,000</td><td class="right">50,000</td></tr>
+      <tr><td>10:52</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.71</td><td class="right red">-13,500,000</td><td class="right">50,000</td></tr>
+      <tr><td>13:29</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.97</td><td class="right red">-500,000</td><td class="right">50,000</td></tr>
+      <tr><td>13:33</td><td class="buy">BUY</td><td class="right">50</td><td class="right">106.95</td><td class="right green">+1,500,000</td><td class="right">50,000</td></tr>
+      <tr><td>14:06</td><td class="sell">SELL</td><td class="right">50</td><td class="right">106.99</td><td class="right green">+500,000</td><td class="right">50,000</td></tr>
+      <tr><td>14:20</td><td class="buy">BUY</td><td class="right">50</td><td class="right">106.97</td><td class="right green">+500,000</td><td class="right">50,000</td></tr>
+      <tr><td>15:07</td><td class="buy">BUY</td><td class="right">50</td><td class="right">106.86</td><td class="right green">+6,000,000</td><td class="right">50,000</td></tr>
+      <tr><td>15:44</td><td class="buy">BUY</td><td class="right">100</td><td class="right">106.98</td><td class="right gray">0</td><td class="right">100,000</td></tr>
+    </table>
+    <div class="tlog-footer"><span>BUY avg 106.86 / SELL avg 106.73</span><span class="red">합계 정산차금 -46,500,000 (수수료 700,000 별도)</span></div>
+  </div>
+</div>
+
+<div class="analysis">
+  <div class="section">
+    <h3>KTB10 기술적 지표 (06-26 종가 기준)</h3>
+    <div class="level-row"><span class="level-label">당일 범위</span><span class="level-val">106.43 ~ 107.04 (0.61pt)</span></div>
+    <div class="level-row"><span class="level-label">종가(15:45 세션)</span><span class="level-val">106.94</span></div>
+    <div class="level-row"><span class="level-label">VWAP(Session)</span><span class="level-val">107.31</span></div>
+    <div class="level-row"><span class="level-label">RSI(14)</span><span class="level-val">64.71 (강세)</span></div>
+    <div class="level-row"><span class="level-label">MA5/20/60/120/200</span><span class="level-val">107.08 / 106.95 / 106.87 / 106.80 / 106.83</span></div>
+    <div class="level-row"><span class="level-label">일일 0.5 ATR존</span><span class="level-val">106.56 ~ 107.40 (전일종가 106.98 기준)</span></div>
+  </div>
+  <div class="section">
+    <h3>오늘 매매 메모</h3>
+    <div class="signal-box bearish">SELL avg(106.73)가 BUY avg(106.86)보다 낮게 체결돼 당일 정산차금은 -46,500,000으로 마감. 09시대 저가권 BUY 2건은 양호했으나, 10:38~10:52 구간 SELL 4건이 그날 저점 부근에서 추가로 체결되며 손실이 커졌다. 장 후반 13:29~15:44 구간은 가격 회복 국면에서 BUY/SELL이 섞여 체결, 등락을 좁히는 데는 기여했지만 추세를 따라가지 못한 모양.</div>
+  </div>
+</div>
+
+<div class="comment-wrap">
+  <h3>내 코멘트</h3>
+  <div class="comment-box" contenteditable="true"></div>
+</div>
+
+<div class="footer-note">
+  생성: Claude Code (claude-sonnet-4-6) · 데이터 소스: 선물거래증적/결과/선물거래_2026-06.xlsx (전체내역) · TradingView MCP (tradesdontlie/tradingview-mcp) ·
+  체결시간: NH선물이 체결시분(01A103) 리포트 대신 정정포함(02A101, 시간 미포함) 리포트만 발송 — 13건 전부 사용자 수기 입력
+</div>
+
+</body>
+</html>
