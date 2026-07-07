@@ -158,7 +158,7 @@ def start_tv():
     for _ in range(15):
         time.sleep(2)
         if check_cdp():
-            print("      CDP 연결 확인 ✓")
+            print("      CDP 연결 확인 [OK]")
             return
     sys.exit("[오류] TradingView CDP 연결 실패")
 
@@ -170,9 +170,16 @@ def get_ohlcv(symbol, out_file):
         ["node", "src/cli/index.js", "symbol", symbol],
         cwd=str(MCP_DIR), capture_output=True, env=env
     )
+    time.sleep(3)
+    # 과거 날짜의 경우 TV 뷰포트를 해당 날짜 범위로 이동해 히스토리 로드
+    subprocess.run(
+        ["node", "src/cli/index.js", "range",
+         "--from", str(SESSION_START), "--to", str(SESSION_END)],
+        cwd=str(MCP_DIR), capture_output=True, env=env
+    )
     time.sleep(4)
     result = subprocess.run(
-        ["node", "src/cli/index.js", "ohlcv", symbol, "5", "300"],
+        ["node", "src/cli/index.js", "ohlcv", "--count", "500"],
         cwd=str(MCP_DIR), capture_output=True, env=env
     )
     raw = result.stdout
