@@ -24,13 +24,15 @@ ASSET_DIR.mkdir(exist_ok=True)
 KST = timezone(timedelta(hours=9))
 
 # ── 인수 파싱 ─────────────────────────────────────────────────────────────
+POSITIONS_FILE = THIS_DIR / "positions.json"
+
 parser = argparse.ArgumentParser()
 parser.add_argument("date", nargs="?", default=None,
                     help="날짜 YYYY/MM/DD (생략 시 오늘)")
-parser.add_argument("--ktb3",  type=str, default="0",
-                    help="KTB3 오버나잇 포지션 예: +240")
-parser.add_argument("--ktb10", type=str, default="0",
-                    help="KTB10 오버나잇 포지션 예: -140")
+parser.add_argument("--ktb3",  type=str, default=None,
+                    help="KTB3 오버나잇 포지션 예: +240 (생략 시 positions.json 자동 로드)")
+parser.add_argument("--ktb10", type=str, default=None,
+                    help="KTB10 오버나잇 포지션 예: -140 (생략 시 positions.json 자동 로드)")
 args = parser.parse_args()
 
 today_kst = datetime.now(tz=KST)
@@ -46,8 +48,24 @@ DATE_DISP = target.strftime("%Y-%m-%d (%a)").replace(
     "Mon","월").replace("Tue","화").replace("Wed","수").replace(
     "Thu","목").replace("Fri","금").replace("Sat","토").replace("Sun","일")
 
-OVN_KTB3  = int(args.ktb3)
-OVN_KTB10 = int(args.ktb10)
+# 오버나잇 포지션: 명시적 args 우선, 없으면 positions.json에서 자동 로드
+def load_prev_positions():
+    if POSITIONS_FILE.exists():
+        try:
+            data = json.loads(POSITIONS_FILE.read_text(encoding="utf-8"))
+            return data.get("ktb3", 0), data.get("ktb10", 0), data.get("date", "?")
+        except Exception:
+            pass
+    return 0, 0, None
+
+_auto_ktb3, _auto_ktb10, _auto_date = load_prev_positions()
+_ktb3_explicit  = args.ktb3  is not None
+_ktb10_explicit = args.ktb10 is not None
+
+OVN_KTB3  = int(args.ktb3)  if _ktb3_explicit  else _auto_ktb3
+OVN_KTB10 = int(args.ktb10) if _ktb10_explicit else _auto_ktb10
+
+_src = "입력값" if (_ktb3_explicit or _ktb10_explicit) else f"자동({_auto_date})"
 
 # 타임스탬프 기준 (1781481600 = 2026-06-15 00:00 UTC = 09:00 KST)
 EPOCH_0615 = 1781481600
@@ -59,7 +77,7 @@ SESSION_END   = DAY_BASE + 6 * 3600 + 45 * 60
 
 print(f"\n{'='*60}")
 print(f"  KTB 데일리 리뷰: {DATE_DISP}")
-print(f"  오버나잇: KTB3 {OVN_KTB3:+d}  /  KTB10 {OVN_KTB10:+d}")
+print(f"  오버나잇: KTB3 {OVN_KTB3:+d}  /  KTB10 {OVN_KTB10:+d}  [{_src}]")
 print(f"{'='*60}\n")
 
 
@@ -530,8 +548,15 @@ print(f"      {r.stdout.strip().splitlines()[0] if r.stdout else r.stderr.strip(
 r2 = subprocess.run(["git", "push"], cwd=str(REPO_DIR), capture_output=True, text=True)
 print(f"      push: {r2.stdout.strip() or r2.stderr.strip()}")
 
+# ── 종료 포지션 저장 (다음 날 오버나잇 자동 계산용) ────────────────────────
+end_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
+end_ktb10 = OVN_KTB10 + buy_q10 - sell_q10
+pos_data = {"date": DATE_SLUG, "ktb3": end_ktb3, "ktb10": end_ktb10}
+POSITIONS_FILE.write_text(json.dumps(pos_data, ensure_ascii=False, indent=2), encoding="utf-8")
+
 print(f"\n{'='*60}")
 print(f"  완료! journal_{DATE_SLUG}.html 브라우저로 열어서 확인")
 print(f"  KTB10: {bma_bars[0]['open']:.2f} → H{bma_hi:.2f}/L{bma_lo:.2f} → {bma_bars[-1]['close']:.2f}")
 print(f"  KTB3:  {bm31_bars[0]['open']:.2f} → H{bm31_hi:.2f}/L{bm31_lo:.2f} → {bm31_bars[-1]['close']:.2f}")
+print(f"  내일 오버나잇 예상: KTB3 {end_ktb3:+d} / KTB10 {end_ktb10:+d}  (positions.json 저장)")
 print(f"{'='*60}\n")
