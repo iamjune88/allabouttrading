@@ -411,8 +411,10 @@ def fmt_side(s):
     if s=="매도": return '<span class="side-sell">▼ SELL</span>'
     return '<span class="side-buy">▲ BUY</span>'
 
-net_ktb10 = total_sell_q - total_buy_q  # 순매도 = 숏 증가
-final_pos_ktb10 = OVN_KTB10 - net_ktb10
+net_ktb10 = sell_q10 - buy_q10          # KTB10 순매도 = 숏 증가
+final_pos_ktb10 = OVN_KTB10 + buy_q10 - sell_q10
+net_ktb3  = sell_q3 - buy_q3           # KTB3 순매도 = 숏 증가
+final_pos_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
 
 rows_html = ""
 pos = OVN_KTB10; cpnl = 0
@@ -469,24 +471,27 @@ html = f"""<!DOCTYPE html>
 
 <h2>포지션 요약</h2>
 <div class="cards">
-  <div class="card"><div class="lbl">KTB3 캐리</div>
-    <div class="val long">{OVN_KTB3:+d}</div>
-    <div class="sub2">변화없음 (KTB3 체결 0건)</div></div>
   <div class="card"><div class="lbl">KTB10 오버나잇</div>
-    <div class="val short">{OVN_KTB10:+d}</div>
-    <div class="sub2">SELL {total_sell_q} / BUY {total_buy_q}</div></div>
+    <div class="val {'short' if OVN_KTB10<0 else 'long' if OVN_KTB10>0 else 'neu'}">{OVN_KTB10:+d}</div>
+    <div class="sub2">{"SELL "+str(sell_q10)+" / BUY "+str(buy_q10) if sell_q10+buy_q10>0 else "체결 없음"}</div></div>
   <div class="card"><div class="lbl">KTB10 순변화</div>
-    <div class="val short">{-net_ktb10:+d}</div>
-    <div class="sub2">매도-매수 순 숏 추가</div></div>
+    <div class="val {'short' if buy_q10-sell_q10<0 else 'long' if buy_q10-sell_q10>0 else 'neu'}">{buy_q10-sell_q10:+d}</div>
+    <div class="sub2">{"숏 추가" if buy_q10-sell_q10<0 else "커버/롱 추가" if buy_q10-sell_q10>0 else "변화없음"}</div></div>
   <div class="card"><div class="lbl">KTB10 마감추정</div>
-    <div class="val short">{final_pos_ktb10:+d}</div>
+    <div class="val {'short' if final_pos_ktb10<0 else 'long' if final_pos_ktb10>0 else 'neu'}">{final_pos_ktb10:+d}</div>
     <div class="sub2">미결잔고 PDF 확인 필요</div></div>
-  <div class="card"><div class="lbl">SELL avg / BUY avg</div>
-    <div class="val neu" style="font-size:16px">{sell_avg:.3f} / {buy_avg:.3f}</div>
-    <div class="sub2">스프레드 <span class="{'long' if sell_avg>buy_avg else 'short'}">{sell_avg-buy_avg:+.3f}pt</span></div></div>
+  <div class="card"><div class="lbl">KTB3 오버나잇</div>
+    <div class="val {'short' if OVN_KTB3<0 else 'long' if OVN_KTB3>0 else 'neu'}">{OVN_KTB3:+d}</div>
+    <div class="sub2">{"SELL "+str(sell_q3)+" / BUY "+str(buy_q3) if sell_q3+buy_q3>0 else "체결 없음"}</div></div>
+  <div class="card"><div class="lbl">KTB3 순변화</div>
+    <div class="val {'short' if buy_q3-sell_q3<0 else 'long' if buy_q3-sell_q3>0 else 'neu'}">{buy_q3-sell_q3:+d}</div>
+    <div class="sub2">{"숏 추가" if buy_q3-sell_q3<0 else "커버/롱 추가" if buy_q3-sell_q3>0 else "변화없음"}</div></div>
+  <div class="card"><div class="lbl">KTB3 마감추정</div>
+    <div class="val {'short' if final_pos_ktb3<0 else 'long' if final_pos_ktb3>0 else 'neu'}">{final_pos_ktb3:+d}</div>
+    <div class="sub2">미결잔고 PDF 확인 필요</div></div>
   <div class="card"><div class="lbl">손익합계(체결기준)</div>
     <div class="val {'long' if total_pnl>0 else 'short'}">{total_pnl/10000:+.0f}만</div>
-    <div class="sub2">수수료 {total_fee/10000:.1f}만 별도</div></div>
+    <div class="sub2">수수료 {total_fee/1000:.0f}천원 별도</div></div>
 </div>
 
 <h2>차트 (KTB10 체결·KTB3 캐리 — 드래그 확대 / 더블클릭 리셋)</h2>
@@ -552,8 +557,9 @@ subprocess.run(["git", "add",
                 "office_pc_pipeline/daily_review.py"],
                cwd=str(REPO_DIR))
 
-msg = (f"daily journal {DATE_SLUG}: KTB10{OVN_KTB10:+d}→{final_pos_ktb10:+d} "
-       f"KTB3{OVN_KTB3:+d} | SELL{total_sell_q}/BUY{total_buy_q} "
+msg = (f"daily journal {DATE_SLUG}: "
+       f"KTB10 {OVN_KTB10:+d}→{final_pos_ktb10:+d} (S{sell_q10}/B{buy_q10}) | "
+       f"KTB3 {OVN_KTB3:+d}→{final_pos_ktb3:+d} (S{sell_q3}/B{buy_q3}) | "
        f"PnL {total_pnl/10000:+.0f}만\n\n"
        f"Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>")
 r = subprocess.run(["git", "commit", "-m", msg], cwd=str(REPO_DIR), capture_output=True, text=True)
