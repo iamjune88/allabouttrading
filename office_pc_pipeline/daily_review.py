@@ -183,19 +183,32 @@ def start_tv():
 def get_ohlcv(symbol, out_file):
     env = os.environ.copy()
     env.pop("ELECTRON_RUN_AS_NODE", None)
-    # 심볼 전환
+    # 심볼 전환 — chart_ready=true 확인 후 진행
     subprocess.run(
         ["node", "src/cli/index.js", "symbol", symbol],
         cwd=str(MCP_DIR), capture_output=True, env=env
     )
-    time.sleep(3)
-    # 과거 날짜의 경우 TV 뷰포트를 해당 날짜 범위로 이동해 히스토리 로드
-    subprocess.run(
-        ["node", "src/cli/index.js", "range",
-         "--from", str(SESSION_START), "--to", str(SESSION_END)],
-        cwd=str(MCP_DIR), capture_output=True, env=env
-    )
-    time.sleep(4)
+    for _ in range(12):
+        time.sleep(2)
+        r = subprocess.run(
+            ["node", "src/cli/index.js", "symbol"],
+            cwd=str(MCP_DIR), capture_output=True, env=env
+        )
+        try:
+            st = json.loads(r.stdout.decode("utf-8", errors="replace"))
+            if st.get("symbol") == symbol and st.get("chart_ready", True):
+                break
+        except Exception:
+            pass
+    # 과거 날짜(오늘 제외)만 TV 뷰포트를 해당 날짜 범위로 이동 — 당일은 range 스킵
+    is_past = DATE_SLUG < today_kst.strftime("%Y%m%d")
+    if is_past:
+        subprocess.run(
+            ["node", "src/cli/index.js", "range",
+             "--from", str(SESSION_START), "--to", str(SESSION_END)],
+            cwd=str(MCP_DIR), capture_output=True, env=env
+        )
+        time.sleep(4)
     result = subprocess.run(
         ["node", "src/cli/index.js", "ohlcv", "--count", "500"],
         cwd=str(MCP_DIR), capture_output=True, env=env
