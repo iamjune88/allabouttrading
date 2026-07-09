@@ -473,19 +473,19 @@ html = f"""<!DOCTYPE html>
 <div class="cards">
   <div class="card"><div class="lbl">KTB10 오버나잇</div>
     <div class="val {'short' if OVN_KTB10<0 else 'long' if OVN_KTB10>0 else 'neu'}">{OVN_KTB10:+d}</div>
-    <div class="sub2">{"SELL "+str(sell_q10)+" / BUY "+str(buy_q10) if sell_q10+buy_q10>0 else "체결 없음"}</div></div>
-  <div class="card"><div class="lbl">KTB10 순변화</div>
-    <div class="val {'short' if buy_q10-sell_q10<0 else 'long' if buy_q10-sell_q10>0 else 'neu'}">{buy_q10-sell_q10:+d}</div>
-    <div class="sub2">{"숏 추가" if buy_q10-sell_q10<0 else "커버/롱 추가" if buy_q10-sell_q10>0 else "변화없음"}</div></div>
+    <div class="sub2">전일이월</div></div>
+  <div class="card"><div class="lbl">KTB10 당일체결</div>
+    <div class="val neu">S{sell_q10} / B{buy_q10}</div>
+    <div class="sub2">{"숏 추가" if buy_q10-sell_q10<0 else "커버/롱" if buy_q10-sell_q10>0 else "체결 없음"} ({buy_q10-sell_q10:+d})</div></div>
   <div class="card"><div class="lbl">KTB10 마감추정</div>
     <div class="val {'short' if final_pos_ktb10<0 else 'long' if final_pos_ktb10>0 else 'neu'}">{final_pos_ktb10:+d}</div>
     <div class="sub2">미결잔고 PDF 확인 필요</div></div>
   <div class="card"><div class="lbl">KTB3 오버나잇</div>
     <div class="val {'short' if OVN_KTB3<0 else 'long' if OVN_KTB3>0 else 'neu'}">{OVN_KTB3:+d}</div>
-    <div class="sub2">{"SELL "+str(sell_q3)+" / BUY "+str(buy_q3) if sell_q3+buy_q3>0 else "체결 없음"}</div></div>
-  <div class="card"><div class="lbl">KTB3 순변화</div>
-    <div class="val {'short' if buy_q3-sell_q3<0 else 'long' if buy_q3-sell_q3>0 else 'neu'}">{buy_q3-sell_q3:+d}</div>
-    <div class="sub2">{"숏 추가" if buy_q3-sell_q3<0 else "커버/롱 추가" if buy_q3-sell_q3>0 else "변화없음"}</div></div>
+    <div class="sub2">전일이월</div></div>
+  <div class="card"><div class="lbl">KTB3 당일체결</div>
+    <div class="val neu">S{sell_q3} / B{buy_q3}</div>
+    <div class="sub2">{"숏 추가" if buy_q3-sell_q3<0 else "커버/롱" if buy_q3-sell_q3>0 else "체결 없음"} ({buy_q3-sell_q3:+d})</div></div>
   <div class="card"><div class="lbl">KTB3 마감추정</div>
     <div class="val {'short' if final_pos_ktb3<0 else 'long' if final_pos_ktb3>0 else 'neu'}">{final_pos_ktb3:+d}</div>
     <div class="sub2">미결잔고 PDF 확인 필요</div></div>
