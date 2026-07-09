@@ -278,6 +278,29 @@ print("[3/6] 차트 데이터 처리...")
 (bma_bars,  bma_ts,  bma_s20,  bma_s60,  bma_rsi,  bma_vwap,  bma_bv,  bma_bm,  bma_hi,  bma_lo)  = process(ohlcv_bma)
 (bm31_bars, bm31_ts, bm31_s20, bm31_s60, bm31_rsi, bm31_vwap, bm31_bv, bm31_bm, bm31_hi, bm31_lo) = process(ohlcv_bm31)
 
+# 전일 종가: SESSION_START 직전 마지막 봉 종가 (갱신차금 계산용)
+def prev_session_close(ohlcv_data):
+    bars = sorted(ohlcv_data["bars"], key=lambda b: b["time"])
+    pre = [b for b in bars if b["time"] < SESSION_START]
+    return pre[-1]["close"] if pre else None
+
+prev_close_ktb3  = prev_session_close(ohlcv_bm31)
+prev_close_ktb10 = prev_session_close(ohlcv_bma)
+today_close_ktb3  = bm31_bars[-1]["close"] if bm31_bars else None
+today_close_ktb10 = bma_bars[-1]["close"]  if bma_bars  else None
+
+MULT = 1_000_000  # KTB3/KTB10: 1pt = 100만원/계약
+ovn_pnl_ktb3  = int(OVN_KTB3  * (today_close_ktb3  - prev_close_ktb3)  * MULT) if (prev_close_ktb3  and today_close_ktb3  and OVN_KTB3  != 0) else 0
+ovn_pnl_ktb10 = int(OVN_KTB10 * (today_close_ktb10 - prev_close_ktb10) * MULT) if (prev_close_ktb10 and today_close_ktb10 and OVN_KTB10 != 0) else 0
+total_ovn_pnl = ovn_pnl_ktb3 + ovn_pnl_ktb10
+total_pnl_all = total_pnl + total_ovn_pnl
+
+if prev_close_ktb3:
+    print(f"      KTB3 전일종가 {prev_close_ktb3:.2f} → 당일종가 {today_close_ktb3:.2f}  갱신차금 {ovn_pnl_ktb3:+,}원")
+if prev_close_ktb10:
+    print(f"      KTB10 전일종가 {prev_close_ktb10:.2f} → 당일종가 {today_close_ktb10:.2f}  갱신차금 {ovn_pnl_ktb10:+,}원")
+print(f"      총손익: 갱신차금 {total_ovn_pnl:+,}원 + 건별 {total_pnl:+,}원 = {total_pnl_all:+,}원")
+
 
 # ── 5. Plotly 차트 생성 ───────────────────────────────────────────────────
 def bar_ts_fn(hh, mm):
@@ -489,8 +512,14 @@ html = f"""<!DOCTYPE html>
   <div class="card"><div class="lbl">KTB3 마감추정</div>
     <div class="val {'short' if final_pos_ktb3<0 else 'long' if final_pos_ktb3>0 else 'neu'}">{final_pos_ktb3:+d}</div>
     <div class="sub2">미결잔고 PDF 확인 필요</div></div>
-  <div class="card"><div class="lbl">손익합계(체결기준)</div>
-    <div class="val {'long' if total_pnl>0 else 'short'}">{total_pnl/10000:+.0f}만</div>
+  <div class="card"><div class="lbl">갱신차금(오버나잇MTM)</div>
+    <div class="val {'long' if total_ovn_pnl>0 else 'short' if total_ovn_pnl<0 else 'neu'}">{total_ovn_pnl/10000:+.0f}만</div>
+    <div class="sub2">KTB3 {ovn_pnl_ktb3/10000:+.0f}만 / KTB10 {ovn_pnl_ktb10/10000:+.0f}만</div></div>
+  <div class="card"><div class="lbl">건별손익(당일체결)</div>
+    <div class="val {'long' if total_pnl>0 else 'short' if total_pnl<0 else 'neu'}">{total_pnl/10000:+.0f}만</div>
+    <div class="sub2">수수료 {total_fee/1000:.0f}천원 별도</div></div>
+  <div class="card" style="border-color:#58a6ff"><div class="lbl">총손익합계</div>
+    <div class="val {'long' if total_pnl_all>0 else 'short' if total_pnl_all<0 else 'neu'}">{total_pnl_all/10000:+.0f}만</div>
     <div class="sub2">수수료 {total_fee/1000:.0f}천원 별도</div></div>
 </div>
 
@@ -560,7 +589,7 @@ subprocess.run(["git", "add",
 msg = (f"daily journal {DATE_SLUG}: "
        f"KTB10 {OVN_KTB10:+d}→{final_pos_ktb10:+d} (S{sell_q10}/B{buy_q10}) | "
        f"KTB3 {OVN_KTB3:+d}→{final_pos_ktb3:+d} (S{sell_q3}/B{buy_q3}) | "
-       f"PnL {total_pnl/10000:+.0f}만\n\n"
+       f"PnL {total_pnl_all/10000:+.0f}만(갱신{total_ovn_pnl/10000:+.0f}+건별{total_pnl/10000:+.0f})\n\n"
        f"Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>")
 r = subprocess.run(["git", "commit", "-m", msg], cwd=str(REPO_DIR), capture_output=True, text=True)
 print(f"      {r.stdout.strip().splitlines()[0] if r.stdout else r.stderr.strip()}")
