@@ -281,8 +281,8 @@ print("[3/6] 차트 데이터 처리...")
 # 전일 종가: 전일 세션 마감(15:45 KST) 이하 마지막 봉 종가 (갱신차금 계산용)
 def prev_session_close(ohlcv_data):
     bars = sorted(ohlcv_data["bars"], key=lambda b: b["time"])
-    prev_end = DAY_BASE - 86400 + 24300  # 전일 00:00 UTC + 6h45m = 전일 15:45 KST
-    pre = [b for b in bars if b["time"] <= prev_end]
+    prev_end = DAY_BASE - 86400 + 24300  # 전일 15:45 KST (야간선물 시작 직전)
+    pre = [b for b in bars if b["time"] < prev_end]  # 정규장 마지막 봉(15:40)만 포함, 야간봉 제외
     return pre[-1]["close"] if pre else None
 
 prev_close_ktb3  = prev_session_close(ohlcv_bm31)
