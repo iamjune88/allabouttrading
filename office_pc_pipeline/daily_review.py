@@ -49,16 +49,25 @@ DATE_DISP = target.strftime("%Y-%m-%d (%a)").replace(
     "Thu","목").replace("Fri","금").replace("Sat","토").replace("Sun","일")
 
 # 오버나잇 포지션: 명시적 args 우선, 없으면 positions.json에서 자동 로드
-def load_prev_positions():
+def load_prev_positions(date_slug):
     if POSITIONS_FILE.exists():
         try:
             data = json.loads(POSITIONS_FILE.read_text(encoding="utf-8"))
-            return data.get("ktb3", 0), data.get("ktb10", 0), data.get("date", "?")
+            pos_date = data.get("date", "")
+            if pos_date == date_slug:
+                # main.py를 당일 먼저 실행한 경우: prev_ktb3/prev_ktb10이 오늘 진입 OVN
+                ovn3  = int(data.get("prev_ktb3",  0) or 0)
+                ovn10 = int(data.get("prev_ktb10", 0) or 0)
+            else:
+                # 전일 포지션 파일: ktb3/ktb10이 오늘 진입 OVN
+                ovn3  = int(data.get("ktb3",  0) or 0)
+                ovn10 = int(data.get("ktb10", 0) or 0)
+            return ovn3, ovn10, pos_date, data
         except Exception:
             pass
-    return 0, 0, None
+    return 0, 0, None, {}
 
-_auto_ktb3, _auto_ktb10, _auto_date = load_prev_positions()
+_auto_ktb3, _auto_ktb10, _auto_date, _pos_data = load_prev_positions(DATE_SLUG)
 _ktb3_explicit  = args.ktb3  is not None
 _ktb10_explicit = args.ktb10 is not None
 
@@ -291,16 +300,34 @@ today_close_ktb3  = bm31_bars[-1]["close"] if bm31_bars else None
 today_close_ktb10 = bma_bars[-1]["close"]  if bma_bars  else None
 
 MULT = 1_000_000  # KTB3/KTB10: 1pt = 100만원/계약
-ovn_pnl_ktb3  = int(OVN_KTB3  * (today_close_ktb3  - prev_close_ktb3)  * MULT) if (prev_close_ktb3  and today_close_ktb3  and OVN_KTB3  != 0) else 0
-ovn_pnl_ktb10 = int(OVN_KTB10 * (today_close_ktb10 - prev_close_ktb10) * MULT) if (prev_close_ktb10 and today_close_ktb10 and OVN_KTB10 != 0) else 0
+
+# 갱신차금: positions.json에 PDF 정산가 기반 값이 있으면 우선, 없으면 OHLCV 근사
+_same_day = (_auto_date == DATE_SLUG) and not (_ktb3_explicit or _ktb10_explicit)
+_pdf_ktb3_pnl  = _pos_data.get("ktb3_ovn_pnl")  if _same_day else None
+_pdf_ktb10_pnl = _pos_data.get("ktb10_ovn_pnl") if _same_day else None
+
+if _pdf_ktb3_pnl is not None and _pdf_ktb10_pnl is not None:
+    ovn_pnl_ktb3  = int(_pdf_ktb3_pnl)
+    ovn_pnl_ktb10 = int(_pdf_ktb10_pnl)
+    _ovn_src = "PDF정산가"
+    _ktb3_set  = _pos_data.get("ktb3_prev_settlement"); _ktb3_tset = _pos_data.get("ktb3_settlement")
+    _ktb10_set = _pos_data.get("ktb10_prev_settlement"); _ktb10_tset = _pos_data.get("ktb10_settlement")
+    if _ktb3_set and _ktb3_tset:
+        print(f"      KTB3 전일정산가 {_ktb3_set:.2f} -> 당일정산가 {_ktb3_tset:.2f}  갱신차금 {ovn_pnl_ktb3:+,}원 [PDF]")
+    if _ktb10_set and _ktb10_tset:
+        print(f"      KTB10 전일정산가 {_ktb10_set:.2f} -> 당일정산가 {_ktb10_tset:.2f}  갱신차금 {ovn_pnl_ktb10:+,}원 [PDF]")
+else:
+    ovn_pnl_ktb3  = int(OVN_KTB3  * (today_close_ktb3  - prev_close_ktb3)  * MULT) if (prev_close_ktb3  and today_close_ktb3  and OVN_KTB3  != 0) else 0
+    ovn_pnl_ktb10 = int(OVN_KTB10 * (today_close_ktb10 - prev_close_ktb10) * MULT) if (prev_close_ktb10 and today_close_ktb10 and OVN_KTB10 != 0) else 0
+    _ovn_src = "OHLCV근사"
+    if prev_close_ktb3:
+        print(f"      KTB3 전일종가 {prev_close_ktb3:.2f} -> 당일종가 {today_close_ktb3:.2f}  갱신차금 {ovn_pnl_ktb3:+,}원 [OHLCV근사]")
+    if prev_close_ktb10:
+        print(f"      KTB10 전일종가 {prev_close_ktb10:.2f} -> 당일종가 {today_close_ktb10:.2f}  갱신차금 {ovn_pnl_ktb10:+,}원 [OHLCV근사]")
+
 total_ovn_pnl = ovn_pnl_ktb3 + ovn_pnl_ktb10
 total_pnl_all = total_pnl + total_ovn_pnl
-
-if prev_close_ktb3:
-    print(f"      KTB3 전일종가 {prev_close_ktb3:.2f} → 당일종가 {today_close_ktb3:.2f}  갱신차금 {ovn_pnl_ktb3:+,}원")
-if prev_close_ktb10:
-    print(f"      KTB10 전일종가 {prev_close_ktb10:.2f} → 당일종가 {today_close_ktb10:.2f}  갱신차금 {ovn_pnl_ktb10:+,}원")
-print(f"      총손익: 갱신차금 {total_ovn_pnl:+,}원 + 건별 {total_pnl:+,}원 = {total_pnl_all:+,}원")
+print(f"      총손익: 갱신차금 {total_ovn_pnl:+,}원({_ovn_src}) + 건별 {total_pnl:+,}원 = {total_pnl_all:+,}원")
 
 
 # ── 5. Plotly 차트 생성 ───────────────────────────────────────────────────
