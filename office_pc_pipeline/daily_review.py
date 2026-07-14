@@ -189,57 +189,99 @@ def start_tv():
             return
     sys.exit("[오류] TradingView CDP 연결 실패")
 
-def get_ohlcv(symbol, out_file):
+def get_ohlcv(symbol, out_file, check_above=None, max_retries=4):
+    """
+    check_above: float — 취득된 OHLCV 중간값이 이 값보다 높아야 유효 (BMA1/BM31 혼동 방지)
+    chart_ready가 True여도 bar 데이터가 아직 이전 심볼 것일 수 있으므로 가격으로 재검증.
+    """
     env = os.environ.copy()
     env.pop("ELECTRON_RUN_AS_NODE", None)
-    # 심볼 전환 — chart_ready=true 확인 후 진행
-    subprocess.run(
-        ["node", "src/cli/index.js", "symbol", symbol],
-        cwd=str(MCP_DIR), capture_output=True, env=env
-    )
-    for _ in range(12):
-        time.sleep(2)
-        r = subprocess.run(
-            ["node", "src/cli/index.js", "symbol"],
-            cwd=str(MCP_DIR), capture_output=True, env=env
-        )
-        try:
-            st = json.loads(r.stdout.decode("utf-8", errors="replace"))
-            if st.get("symbol") == symbol and st.get("chart_ready", True):
-                break
-        except Exception:
-            pass
-    # 과거 날짜(오늘 제외)만 TV 뷰포트를 해당 날짜 범위로 이동 — 당일은 range 스킵
     is_past = DATE_SLUG < today_kst.strftime("%Y%m%d")
-    if is_past:
+    last_raw, last_data = None, {"bars": []}
+
+    for attempt in range(max_retries):
+        if attempt > 0:
+            print(f"      [{symbol}] 재시도 {attempt}/{max_retries-1} (6초 대기)...")
+            time.sleep(6)
+
         subprocess.run(
-            ["node", "src/cli/index.js", "range",
-             "--from", str(SESSION_START), "--to", str(SESSION_END)],
+            ["node", "src/cli/index.js", "symbol", symbol],
             cwd=str(MCP_DIR), capture_output=True, env=env
         )
-        time.sleep(4)
-    result = subprocess.run(
-        ["node", "src/cli/index.js", "ohlcv", "--count", "500"],
-        cwd=str(MCP_DIR), capture_output=True, env=env
-    )
-    raw = result.stdout
-    if isinstance(raw, bytes):
-        for enc in ["utf-8-sig","utf-8","cp949"]:
-            try: raw = raw.decode(enc); break
-            except: pass
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.write(raw)
-    data = json.loads(raw)
-    n_bars = len(data.get("bars",[]))
-    print(f"      {symbol}: {n_bars}봉 취득")
-    return data
+        for _ in range(15):  # 최대 30초
+            time.sleep(2)
+            r = subprocess.run(
+                ["node", "src/cli/index.js", "symbol"],
+                cwd=str(MCP_DIR), capture_output=True, env=env
+            )
+            try:
+                st = json.loads(r.stdout.decode("utf-8", errors="replace"))
+                if st.get("symbol") == symbol and st.get("chart_ready", False):
+                    break
+            except Exception:
+                pass
+
+        time.sleep(3)  # chart_ready 직후에도 bar 데이터 로드 시간 필요
+
+        if is_past:
+            subprocess.run(
+                ["node", "src/cli/index.js", "range",
+                 "--from", str(SESSION_START), "--to", str(SESSION_END)],
+                cwd=str(MCP_DIR), capture_output=True, env=env
+            )
+            time.sleep(6)  # range 후 재로드 대기
+
+        result = subprocess.run(
+            ["node", "src/cli/index.js", "ohlcv", "--count", "500"],
+            cwd=str(MCP_DIR), capture_output=True, env=env
+        )
+        raw = result.stdout
+        if isinstance(raw, bytes):
+            for enc in ["utf-8-sig", "utf-8", "cp949"]:
+                try: raw = raw.decode(enc); break
+                except: pass
+
+        try:
+            data = json.loads(raw)
+        except Exception:
+            continue
+
+        bars = data.get("bars", [])
+        if not bars:
+            continue
+
+        last_raw, last_data = raw, data
+
+        # 가격 검증: BMA1(KTB10)은 BM31(KTB3) 중간값보다 반드시 높아야 함
+        if check_above is not None:
+            closes = [b["close"] for b in bars]
+            median_c = sorted(closes)[len(closes) // 2]
+            if median_c <= check_above + 0.5:
+                print(f"      [{symbol}] 가격 검증 실패: 중간값 {median_c:.3f} (BM31 대비 {median_c - check_above:+.3f}pt) — 재시도")
+                continue
+
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(raw if isinstance(raw, str) else raw)
+        print(f"      {symbol}: {len(bars)}봉 취득")
+        return data
+
+    # 모든 재시도 실패시 마지막 데이터로 진행
+    print(f"      [{symbol}] 경고: 가격 검증 실패 지속, 마지막 데이터로 진행")
+    if last_raw:
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(last_raw if isinstance(last_raw, str) else last_raw)
+    return last_data
 
 print("[2/6] TV CDP 확인 + OHLCV 취득...")
 if not check_cdp():
     start_tv()
 
-ohlcv_bma  = get_ohlcv("BMA1!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BMA1.json")
+# BM31 먼저 취득 (안정적), 그 중간값으로 BMA1 가격 검증 (혼동 방지)
 ohlcv_bm31 = get_ohlcv("BM31!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BM31.json")
+_bm31_closes = [b["close"] for b in ohlcv_bm31.get("bars", [])]
+_bm31_median = sorted(_bm31_closes)[len(_bm31_closes) // 2] if _bm31_closes else 0
+ohlcv_bma  = get_ohlcv("BMA1!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BMA1.json",
+                         check_above=_bm31_median)
 
 
 # ── 4. 차트 데이터 처리 ───────────────────────────────────────────────────
