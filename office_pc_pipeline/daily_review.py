@@ -667,10 +667,15 @@ r2 = subprocess.run(["git", "push"], cwd=str(REPO_DIR), capture_output=True, tex
 print(f"      push: {r2.stdout.strip() or r2.stderr.strip()}")
 
 # ── 종료 포지션 저장 (다음 날 오버나잇 자동 계산용) ────────────────────────
+# 기존 positions.json merge — main.py가 쓴 prev_ktb3/settlement/ovn_pnl 등 보존
 end_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
 end_ktb10 = OVN_KTB10 + buy_q10 - sell_q10
-pos_data = {"date": DATE_SLUG, "ktb3": end_ktb3, "ktb10": end_ktb10}
-POSITIONS_FILE.write_text(json.dumps(pos_data, ensure_ascii=False, indent=2), encoding="utf-8")
+try:
+    _existing = json.loads(POSITIONS_FILE.read_text(encoding="utf-8"))
+except Exception:
+    _existing = {}
+_existing.update({"date": DATE_SLUG, "ktb3": end_ktb3, "ktb10": end_ktb10})
+POSITIONS_FILE.write_text(json.dumps(_existing, ensure_ascii=False, indent=2), encoding="utf-8")
 
 print(f"\n{'='*60}")
 print(f"  완료! journal_{DATE_SLUG}.html 브라우저로 열어서 확인")
