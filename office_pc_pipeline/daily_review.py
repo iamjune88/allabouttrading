@@ -189,10 +189,11 @@ def start_tv():
             return
     sys.exit("[오류] TradingView CDP 연결 실패")
 
-def get_ohlcv(symbol, out_file, check_above=None, max_retries=4):
+def get_ohlcv(symbol, out_file, price_near=None, price_tol=1.5, max_retries=4):
     """
-    check_above: float — 취득된 OHLCV 중간값이 이 값보다 높아야 유효 (BMA1/BM31 혼동 방지)
-    chart_ready가 True여도 bar 데이터가 아직 이전 심볼 것일 수 있으므로 가격으로 재검증.
+    price_near: 전일 정산가 기준 절대값 검증 (positions.json에서 로드)
+    price_tol:  허용 편차 (기본 +-1.5pt)
+    chart_ready 직후에도 bar 데이터가 이전 심볼 것일 수 있으므로 가격으로 재검증.
     """
     env = os.environ.copy()
     env.pop("ELECTRON_RUN_AS_NODE", None)
@@ -223,13 +224,13 @@ def get_ohlcv(symbol, out_file, check_above=None, max_retries=4):
 
         time.sleep(3)  # chart_ready 직후에도 bar 데이터 로드 시간 필요
 
-        if is_past:
-            subprocess.run(
-                ["node", "src/cli/index.js", "range",
-                 "--from", str(SESSION_START), "--to", str(SESSION_END)],
-                cwd=str(MCP_DIR), capture_output=True, env=env
-            )
-            time.sleep(6)  # range 후 재로드 대기
+        # 항상 range 명령 전송 — 이전 실행이 다른 날짜 뷰포트를 고정했을 수 있음
+        subprocess.run(
+            ["node", "src/cli/index.js", "range",
+             "--from", str(SESSION_START), "--to", str(SESSION_END)],
+            cwd=str(MCP_DIR), capture_output=True, env=env
+        )
+        time.sleep(6)
 
         result = subprocess.run(
             ["node", "src/cli/index.js", "ohlcv", "--count", "500"],
@@ -252,12 +253,18 @@ def get_ohlcv(symbol, out_file, check_above=None, max_retries=4):
 
         last_raw, last_data = raw, data
 
-        # 가격 검증: BMA1(KTB10)은 BM31(KTB3) 중간값보다 반드시 높아야 함
-        if check_above is not None:
-            closes = [b["close"] for b in bars]
+        # 검증1: 오늘 세션 봉이 반드시 있어야 함
+        session_bars = [b for b in bars if b["time"] >= SESSION_START]
+        if not session_bars:
+            print(f"      [{symbol}] 오늘 세션 봉 없음 -> 재시도")
+            continue
+
+        # 검증2: 전일 정산가 +-price_tol 범위 이내여야 정상 데이터
+        if price_near is not None:
+            closes = [b["close"] for b in session_bars]
             median_c = sorted(closes)[len(closes) // 2]
-            if median_c <= check_above + 0.5:
-                print(f"      [{symbol}] 가격 검증 실패: 중간값 {median_c:.3f} (BM31 대비 {median_c - check_above:+.3f}pt) — 재시도")
+            if abs(median_c - price_near) > price_tol:
+                print(f"      [{symbol}] 가격 검증 실패: {median_c:.3f} (기준 {price_near:.3f}+-{price_tol}) -> 재시도")
                 continue
 
         with open(out_file, "w", encoding="utf-8") as f:
@@ -276,12 +283,15 @@ print("[2/6] TV CDP 확인 + OHLCV 취득...")
 if not check_cdp():
     start_tv()
 
-# BM31 먼저 취득 (안정적), 그 중간값으로 BMA1 가격 검증 (혼동 방지)
-ohlcv_bm31 = get_ohlcv("BM31!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BM31.json")
-_bm31_closes = [b["close"] for b in ohlcv_bm31.get("bars", [])]
-_bm31_median = sorted(_bm31_closes)[len(_bm31_closes) // 2] if _bm31_closes else 0
+# 전일 정산가를 기준으로 각 심볼 절대 가격 검증 (BM31/BMA1 혼동 방지)
+# positions.json에서 로드 — 없으면 None (검증 스킵)
+_ktb3_ref  = _pos_data.get("ktb3_settlement")  or _pos_data.get("ktb3_prev_settlement")
+_ktb10_ref = _pos_data.get("ktb10_settlement") or _pos_data.get("ktb10_prev_settlement")
+
+ohlcv_bm31 = get_ohlcv("BM31!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BM31.json",
+                         price_near=_ktb3_ref)
 ohlcv_bma  = get_ohlcv("BMA1!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BMA1.json",
-                         check_above=_bm31_median)
+                         price_near=_ktb10_ref)
 
 
 # ── 4. 차트 데이터 처리 ───────────────────────────────────────────────────
@@ -310,6 +320,9 @@ def process(ohlcv_data):
     s20=sma(closes,20); s60=sma(closes,60); rs=rsi(closes)
     idx=[i for i,b in enumerate(bars) if b["time"]>=SESSION_START]
     sb=[bars[i] for i in idx]
+    if not sb:  # 세션 봉 없으면 마지막 100봉으로 fallback (날짜 오류 상황)
+        sb = bars[-min(100, len(bars)):]
+        print(f"      [경고] 세션 봉 없음 - 최근 {len(sb)}봉으로 대체")
     ts=[datetime.fromtimestamp(b["time"],tz=KST) for b in sb]
     vwap=[]; cpv=0.0; cv=0.0
     for b in sb:
