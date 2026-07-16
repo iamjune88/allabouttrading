@@ -314,14 +314,20 @@ def rsi(series, period=14):
     return out
 
 def process(ohlcv_data):
-    bars = sorted(ohlcv_data["bars"], key=lambda b: b["time"])
-    bars = [b for b in bars if b["time"] < SESSION_END+300]
+    bars = sorted(ohlcv_data.get("bars", []), key=lambda b: b["time"])
+    filtered = [b for b in bars if b["time"] < SESSION_END+300]
+    bars = filtered if filtered else bars  # TV가 다음날 봉 반환 시 필터 후 빈 경우 원본 사용
+    if not bars:  # bars 자체가 완전히 빈 경우 - dummy로 크래시 방지
+        dummy = {"time": SESSION_START, "open": 0.0, "high": 0.0, "low": 0.0, "close": 0.0, "volume": 0}
+        bars = [dummy]
+        print(f"      [경고] 봉 데이터 완전 없음 - dummy 봉으로 대체")
     closes = [b["close"] for b in bars]
     s20=sma(closes,20); s60=sma(closes,60); rs=rsi(closes)
     idx=[i for i,b in enumerate(bars) if b["time"]>=SESSION_START]
     sb=[bars[i] for i in idx]
     if not sb:  # 세션 봉 없으면 마지막 100봉으로 fallback (날짜 오류 상황)
         sb = bars[-min(100, len(bars)):]
+        idx = list(range(max(0, len(bars)-min(100, len(bars))), len(bars)))
         print(f"      [경고] 세션 봉 없음 - 최근 {len(sb)}봉으로 대체")
     ts=[datetime.fromtimestamp(b["time"],tz=KST) for b in sb]
     vwap=[]; cpv=0.0; cv=0.0
