@@ -13,7 +13,8 @@ import json, os, shutil, datetime as dt
 import pandas as pd
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-RAW_DIR   = os.path.join(BASE, "raw")
+RAW_ROOT  = os.path.join(BASE, "raw")
+RAW_DIR   = RAW_ROOT
 DATA_DIR  = os.path.join(BASE, "data")
 
 for d in (RAW_DIR, DATA_DIR):
@@ -33,10 +34,13 @@ INTRADAY, DAILY, STATE = _paths()
 
 
 def set_output_tag(tag: str):
-    """intraday/daily/state 출력 파일을 <name>_<tag> 로 전환.
-    raw 원본은 날짜 파일명(3807_YYYYMMDD.xlsx)이라 연도 충돌이 없어 공용 유지."""
-    global INTRADAY, DAILY, STATE
+    """intraday/daily/state 출력 파일을 <name>_<tag> 로, raw 원본은 raw/<tag>/ 하위폴더로 전환.
+    상품이 다르면(예: 3년 vs 10년) 같은 날짜라도 raw 파일명(3807_YYYYMMDD.xlsx)이 겹치므로,
+    태그별 하위폴더로 분리해 서로 덮어쓰지 않게 한다. (무태그 = raw/ 루트, 기존 3년물 그대로)"""
+    global INTRADAY, DAILY, STATE, RAW_DIR
     INTRADAY, DAILY, STATE = _paths(tag)
+    RAW_DIR = os.path.join(RAW_ROOT, tag) if tag else RAW_ROOT
+    os.makedirs(RAW_DIR, exist_ok=True)
     return INTRADAY, DAILY, STATE
 
 
@@ -73,14 +77,14 @@ def archive_raw(src_path: str, date) -> str:
 
 
 def append_intraday(df: pd.DataFrame):
-    """중복 방지: 같은 date 가 이미 있으면 먼저 제거 후 append."""
+    """중복 방지(같은 date 재수집 시 기존 제거) + 항상 시간순 정렬 유지."""
     header = not os.path.exists(INTRADAY)
     if not header:
-        # 같은 날짜 기존 행 제거(재수집 대비)
         try:
             old = pd.read_csv(INTRADAY)
             old = old[old["date"] != str(df["date"].iloc[0])]
             df_all = pd.concat([old, df], ignore_index=True)
+            df_all = df_all.sort_values(["date", "time"]).reset_index(drop=True)
             df_all.to_csv(INTRADAY, index=False)
             return
         except Exception:
