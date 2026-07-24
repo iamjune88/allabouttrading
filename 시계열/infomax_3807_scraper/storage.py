@@ -15,12 +15,29 @@ import pandas as pd
 BASE = os.path.dirname(os.path.abspath(__file__))
 RAW_DIR   = os.path.join(BASE, "raw")
 DATA_DIR  = os.path.join(BASE, "data")
-INTRADAY  = os.path.join(DATA_DIR, "intraday.csv")
-DAILY     = os.path.join(DATA_DIR, "daily.csv")
-STATE     = os.path.join(DATA_DIR, "state.json")
 
 for d in (RAW_DIR, DATA_DIR):
     os.makedirs(d, exist_ok=True)
+
+
+def _paths(tag=""):
+    """tag 가 있으면 파일명에 접미어(_tag)를 붙여 연도별 등으로 분리 저장."""
+    suf = f"_{tag}" if tag else ""
+    return (os.path.join(DATA_DIR, f"intraday{suf}.csv"),
+            os.path.join(DATA_DIR, f"daily{suf}.csv"),
+            os.path.join(DATA_DIR, f"state{suf}.json"))
+
+
+# 기본(무태그) 경로. set_output_tag() 로 런타임에 바꿀 수 있음.
+INTRADAY, DAILY, STATE = _paths()
+
+
+def set_output_tag(tag: str):
+    """intraday/daily/state 출력 파일을 <name>_<tag> 로 전환.
+    raw 원본은 날짜 파일명(3807_YYYYMMDD.xlsx)이라 연도 충돌이 없어 공용 유지."""
+    global INTRADAY, DAILY, STATE
+    INTRADAY, DAILY, STATE = _paths(tag)
+    return INTRADAY, DAILY, STATE
 
 
 def load_state() -> dict:

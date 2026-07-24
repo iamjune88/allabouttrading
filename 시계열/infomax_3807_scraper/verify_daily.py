@@ -5,7 +5,10 @@ import pandas as pd
 try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception: pass
 BASE = os.path.dirname(os.path.abspath(__file__))
-DAILY = os.path.join(BASE, "data", "daily.csv")
+# 사용: python verify_daily.py [tag]   (예: python verify_daily.py 2025 -> daily_2025.csv)
+_TAG = sys.argv[1] if len(sys.argv) > 1 else ""
+_SUF = f"_{_TAG}" if _TAG else ""
+DAILY = os.path.join(BASE, "data", f"daily{_SUF}.csv")
 
 def main():
     if not os.path.exists(DAILY):

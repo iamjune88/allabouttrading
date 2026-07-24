@@ -161,10 +161,15 @@ def main():
     ap.add_argument('--descending', action='store_true', help='최신일부터')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--retry-errors', action='store_true', help='이전 error 날짜만 재시도')
+    ap.add_argument('--tag', default='', help='연도별 등 별도 파일로 저장 (예: --tag 2025 -> intraday_2025.csv)')
     args = ap.parse_args()
 
     if not args.start:
         print("--start YYYY-MM-DD 필요"); sys.exit(1)
+
+    if args.tag:
+        storage.set_output_tag(args.tag)
+        print(f"출력 태그: {args.tag}  ({os.path.basename(storage.DAILY)}, {os.path.basename(storage.INTRADAY)})")
 
     days = candidate_trading_days(args.start, args.end, ascending=not args.descending)
     state = storage.load_state()
