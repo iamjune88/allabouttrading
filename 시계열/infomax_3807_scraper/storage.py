@@ -2,7 +2,8 @@
 """수집 상태 관리 + 통합 CSV 누적 + 원본 보관.
 
 산출물 (data/ 폴더):
-  - intraday.csv : 분봉 누적치 long-format (date,time,datetime,index,투자자별 매도/매수/순매수)
+  - intraday.csv : 30초봉 누적치 long-format (date,time,datetime,index,투자자별 매도/매수/순매수)
+                   투자자 = 외국인합(frgn)/증권(secu)/투신(trust)/은행(bank)
   - daily.csv    : 일별 최종 누적 요약 (한 행 = 하루)
   - state.json   : {날짜: 'ok'|'holiday'|'error'} 재실행시 이어받기용
 원본:

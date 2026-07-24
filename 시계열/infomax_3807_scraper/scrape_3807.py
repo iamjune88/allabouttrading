@@ -151,7 +151,7 @@ def scrape_one(win_h, grid_h, app, date):
     storage.append_intraday(df)
     storage.append_daily(summ)
     return 'ok', (f"봉 {summ['n_bars']} | 외국인 {summ['frgn_net']:+,} "
-                  f"개인 {summ['indi_net']:+,} 기관 {summ['inst_net']:+,}")
+                  f"증권 {summ['secu_net']:+,} 투신 {summ['trust_net']:+,} 은행 {summ['bank_net']:+,}")
 
 
 def main():
