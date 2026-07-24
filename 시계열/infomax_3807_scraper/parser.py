@@ -71,6 +71,14 @@ def parse_export(path, date):
         summ[f"{g}_buy"] = _i(f"{g}_buy")
         summ[f"{g}_sell"] = _i(f"{g}_sell")
     summ["n_bars"] = len(df)
+
+    # --- 절단(오전 결손) 감지 ---
+    # 그리드 export 는 최신 ~1200행만 유지(FIFO). 하루가 1200봉을 넘으면(비정상 패딩/연장
+    # 등) 오전이 버퍼에서 밀려나 잘린다. 즉 절단된 날은 반드시 n_bars 가 상한(~1200)에 닿고,
+    # 정상일(9시장 959 / 8:45장 989 < 1200)과 겹치지 않으므로 이 단일 신호로 충분히 정확하다.
+    # (첫 봉 순매수 비율 같은 지표는 개장 동시호가 때문에 오탐이 많아 쓰지 않는다.)
+    summ["first_time"] = str(df.iloc[0]["time"])
+    summ["truncated"] = int(len(df) >= 1195)
     return df, summ
 
 

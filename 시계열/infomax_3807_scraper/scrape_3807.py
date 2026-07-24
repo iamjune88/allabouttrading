@@ -150,8 +150,9 @@ def scrape_one(win_h, grid_h, app, date):
         return 'holiday', f"봉 {summ['n_bars']}개(휴장/무자료 추정)"
     storage.append_intraday(df)
     storage.append_daily(summ)
+    warn = f"  ⚠절단의심(첫봉 {summ['first_time']})" if summ.get('truncated') else ""
     return 'ok', (f"봉 {summ['n_bars']} | 외국인 {summ['frgn_net']:+,} "
-                  f"증권 {summ['secu_net']:+,} 투신 {summ['trust_net']:+,} 은행 {summ['bank_net']:+,}")
+                  f"증권 {summ['secu_net']:+,} 투신 {summ['trust_net']:+,} 은행 {summ['bank_net']:+,}{warn}")
 
 
 def main():
