@@ -24,15 +24,13 @@ ASSET_DIR.mkdir(exist_ok=True)
 KST = timezone(timedelta(hours=9))
 
 # ── 인수 파싱 ─────────────────────────────────────────────────────────────
-POSITIONS_FILE = THIS_DIR / "positions.json"
-
 parser = argparse.ArgumentParser()
 parser.add_argument("date", nargs="?", default=None,
                     help="날짜 YYYY/MM/DD (생략 시 오늘)")
 parser.add_argument("--ktb3",  type=str, default=None,
-                    help="KTB3 오버나잇 포지션 예: +240 (생략 시 positions.json 자동 로드)")
+                    help="KTB3 오버나잇 포지션 예: +240 (생략 시 Excel 누적합에서 자동 계산)")
 parser.add_argument("--ktb10", type=str, default=None,
-                    help="KTB10 오버나잇 포지션 예: -140 (생략 시 positions.json 자동 로드)")
+                    help="KTB10 오버나잇 포지션 예: -140 (생략 시 Excel 누적합에서 자동 계산)")
 args = parser.parse_args()
 
 today_kst = datetime.now(tz=KST)
@@ -48,33 +46,48 @@ DATE_DISP = target.strftime("%Y-%m-%d (%a)").replace(
     "Mon","월").replace("Tue","화").replace("Wed","수").replace(
     "Thu","목").replace("Fri","금").replace("Sat","토").replace("Sun","일")
 
-# 오버나잇 포지션: 명시적 args 우선, 없으면 positions.json에서 자동 로드
-def load_prev_positions(date_slug):
-    if POSITIONS_FILE.exists():
-        try:
-            data = json.loads(POSITIONS_FILE.read_text(encoding="utf-8"))
-            pos_date = data.get("date", "")
-            if pos_date == date_slug:
-                # main.py를 당일 먼저 실행한 경우: prev_ktb3/prev_ktb10이 오늘 진입 OVN
-                ovn3  = int(data.get("prev_ktb3",  0) or 0)
-                ovn10 = int(data.get("prev_ktb10", 0) or 0)
-            else:
-                # 전일 포지션 파일: ktb3/ktb10이 오늘 진입 OVN
-                ovn3  = int(data.get("ktb3",  0) or 0)
-                ovn10 = int(data.get("ktb10", 0) or 0)
-            return ovn3, ovn10, pos_date, data
-        except Exception:
-            pass
-    return 0, 0, None, {}
+# 오버나잇 포지션: 명시적 args 우선, 없으면 Excel 누적합에서 결정론적으로 계산.
+import ovn_tracker
 
-_auto_ktb3, _auto_ktb10, _auto_date, _pos_data = load_prev_positions(DATE_SLUG)
 _ktb3_explicit  = args.ktb3  is not None
 _ktb10_explicit = args.ktb10 is not None
+
+_ovn_info = {}
+try:
+    _ovn_info = ovn_tracker.compute_ovn(DATE_STR)
+    _auto_ktb3, _auto_ktb10 = _ovn_info["ovn_ktb3"], _ovn_info["ovn_ktb10"]
+    _auto_desc = f"Excel누적/anchor {_ovn_info['anchor_date']}"
+except Exception as e:
+    _auto_ktb3, _auto_ktb10 = 0, 0
+    _auto_desc = f"계산실패({e})"
 
 OVN_KTB3  = int(args.ktb3)  if _ktb3_explicit  else _auto_ktb3
 OVN_KTB10 = int(args.ktb10) if _ktb10_explicit else _auto_ktb10
 
-_src = "입력값" if (_ktb3_explicit or _ktb10_explicit) else f"자동({_auto_date})"
+_src = "입력값" if (_ktb3_explicit or _ktb10_explicit) else _auto_desc
+
+# ── 크로스체크: Excel 누적 OVN ↔ 브로커 확정 미결제약정 ──
+import ovn_crosscheck
+_snapshot = ovn_crosscheck.load_snapshot(DATE_STR)
+_xcheck = None
+if _snapshot and not (_ktb3_explicit or _ktb10_explicit):
+    _xcheck = ovn_crosscheck.crosscheck(_ovn_info, _snapshot)
+    for _w in _xcheck["warnings"]:
+        print(f"  [경고] {_w}")
+    if not _xcheck["ok"]:
+        print(f"\n{'!'*60}")
+        print("  [중단] Excel 누적 OVN과 브로커 미결제약정이 불일치합니다.")
+        for _m in _xcheck["mismatches"]:
+            print(f"    - {_m}")
+        print("  Excel 체결 증적 누락/중복 또는 anchor 오류 가능성. 확인 후 재실행하세요.")
+        print(f"    (수동 확정 시: --ktb3 {_snapshot['entry']['ktb3']:+d} "
+              f"--ktb10 {_snapshot['entry']['ktb10']:+d})")
+        print(f"{'!'*60}\n")
+        sys.exit(1)
+    print(f"  [크로스체크 OK] 브로커 미결제약정과 진입 OVN 일치 "
+          f"(brokers: {','.join(_snapshot['brokers'])})")
+elif not _snapshot and not (_ktb3_explicit or _ktb10_explicit):
+    print("  [크로스체크 생략] 해당 날짜 브로커 스냅샷 없음 (main.py 미실행 또는 SS/NH 미결 부재)")
 
 # 타임스탬프 기준 (1781481600 = 2026-06-15 00:00 UTC = 09:00 KST)
 EPOCH_0615 = 1781481600
@@ -191,7 +204,7 @@ def start_tv():
 
 def get_ohlcv(symbol, out_file, price_near=None, price_tol=1.5, max_retries=4):
     """
-    price_near: 전일 정산가 기준 절대값 검증 (positions.json에서 로드)
+    price_near: 전일 정산가 기준 절대값 검증 (브로커 스냅샷 당일정산가에서 로드)
     price_tol:  허용 편차 (기본 +-1.5pt)
     chart_ready 직후에도 bar 데이터가 이전 심볼 것일 수 있으므로 가격으로 재검증.
     """
@@ -284,9 +297,15 @@ if not check_cdp():
     start_tv()
 
 # 전일 정산가를 기준으로 각 심볼 절대 가격 검증 (BM31/BMA1 혼동 방지)
-# positions.json에서 로드 — 없으면 None (검증 스킵)
-_ktb3_ref  = _pos_data.get("ktb3_settlement")  or _pos_data.get("ktb3_prev_settlement")
-_ktb10_ref = _pos_data.get("ktb10_settlement") or _pos_data.get("ktb10_prev_settlement")
+# 브로커 스냅샷의 당일정산가에서 로드 — 없으면 None (검증 스킵)
+def _settle_ref(leg):
+    if not _snapshot:
+        return None
+    s = _snapshot.get("settlement", {}).get(leg, {})
+    return s.get("today") or s.get("prev")
+
+_ktb3_ref  = _settle_ref("ktb3")
+_ktb10_ref = _settle_ref("ktb10")
 
 ohlcv_bm31 = get_ohlcv("BM31!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BM31.json",
                          price_near=_ktb3_ref)
@@ -362,21 +381,13 @@ today_close_ktb10 = bma_bars[-1]["close"]  if bma_bars  else None
 
 MULT = 1_000_000  # KTB3/KTB10: 1pt = 100만원/계약
 
-# 갱신차금: positions.json에 PDF 정산가 기반 값이 있으면 우선, 없으면 OHLCV 근사
-_same_day = (_auto_date == DATE_SLUG) and not (_ktb3_explicit or _ktb10_explicit)
-_pdf_ktb3_pnl  = _pos_data.get("ktb3_ovn_pnl")  if _same_day else None
-_pdf_ktb10_pnl = _pos_data.get("ktb10_ovn_pnl") if _same_day else None
-
-if _pdf_ktb3_pnl is not None and _pdf_ktb10_pnl is not None:
-    ovn_pnl_ktb3  = int(_pdf_ktb3_pnl)
-    ovn_pnl_ktb10 = int(_pdf_ktb10_pnl)
-    _ovn_src = "PDF정산가"
-    _ktb3_set  = _pos_data.get("ktb3_prev_settlement"); _ktb3_tset = _pos_data.get("ktb3_settlement")
-    _ktb10_set = _pos_data.get("ktb10_prev_settlement"); _ktb10_tset = _pos_data.get("ktb10_settlement")
-    if _ktb3_set and _ktb3_tset:
-        print(f"      KTB3 전일정산가 {_ktb3_set:.2f} -> 당일정산가 {_ktb3_tset:.2f}  갱신차금 {ovn_pnl_ktb3:+,}원 [PDF]")
-    if _ktb10_set and _ktb10_tset:
-        print(f"      KTB10 전일정산가 {_ktb10_set:.2f} -> 당일정산가 {_ktb10_tset:.2f}  갱신차금 {ovn_pnl_ktb10:+,}원 [PDF]")
+# 갱신차금(오버나잇 MTM): 브로커 확정값(스냅샷) 우선, 없으면 OHLCV 종가 근사.
+_renewal = _xcheck["renewal"] if _xcheck else None
+if _renewal and (_renewal.get("ktb3") or _renewal.get("ktb10")):
+    ovn_pnl_ktb3  = int(_renewal.get("ktb3", 0))
+    ovn_pnl_ktb10 = int(_renewal.get("ktb10", 0))
+    _ovn_src = _xcheck["renewal_source"]
+    print(f"      KTB3 갱신차금 {ovn_pnl_ktb3:+,}원  KTB10 {ovn_pnl_ktb10:+,}원 [{_ovn_src}]")
 else:
     ovn_pnl_ktb3  = int(OVN_KTB3  * (today_close_ktb3  - prev_close_ktb3)  * MULT) if (prev_close_ktb3  and today_close_ktb3  and OVN_KTB3  != 0) else 0
     ovn_pnl_ktb10 = int(OVN_KTB10 * (today_close_ktb10 - prev_close_ktb10) * MULT) if (prev_close_ktb10 and today_close_ktb10 and OVN_KTB10 != 0) else 0
@@ -685,20 +696,13 @@ print(f"      {r.stdout.strip().splitlines()[0] if r.stdout else r.stderr.strip(
 r2 = subprocess.run(["git", "push"], cwd=str(REPO_DIR), capture_output=True, text=True)
 print(f"      push: {r2.stdout.strip() or r2.stderr.strip()}")
 
-# ── 종료 포지션 저장 (다음 날 오버나잇 자동 계산용) ────────────────────────
-# 기존 positions.json merge — main.py가 쓴 prev_ktb3/settlement/ovn_pnl 등 보존
+# ── 종료 포지션 ── positions.json 체인 폐기: 다음 날 OVN은 Excel에서 재계산.
 end_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
 end_ktb10 = OVN_KTB10 + buy_q10 - sell_q10
-try:
-    _existing = json.loads(POSITIONS_FILE.read_text(encoding="utf-8"))
-except Exception:
-    _existing = {}
-_existing.update({"date": DATE_SLUG, "ktb3": end_ktb3, "ktb10": end_ktb10})
-POSITIONS_FILE.write_text(json.dumps(_existing, ensure_ascii=False, indent=2), encoding="utf-8")
 
 print(f"\n{'='*60}")
 print(f"  완료! journal_{DATE_SLUG}.html 브라우저로 열어서 확인")
 print(f"  KTB10: {bma_bars[0]['open']:.2f} → H{bma_hi:.2f}/L{bma_lo:.2f} → {bma_bars[-1]['close']:.2f}")
 print(f"  KTB3:  {bm31_bars[0]['open']:.2f} → H{bm31_hi:.2f}/L{bm31_lo:.2f} → {bm31_bars[-1]['close']:.2f}")
-print(f"  내일 오버나잇 예상: KTB3 {end_ktb3:+d} / KTB10 {end_ktb10:+d}  (positions.json 저장)")
+print(f"  내일 오버나잇 예상: KTB3 {end_ktb3:+d} / KTB10 {end_ktb10:+d}  (Excel 누적에서 재계산)")
 print(f"{'='*60}\n")

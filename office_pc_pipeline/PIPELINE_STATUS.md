@@ -160,4 +160,32 @@ TV가 다음날 봉 반환 → `SESSION_END+300` 필터 후 bars 빈 리스트 �
 
 ---
 
-*이 문서는 Fable 모델 전환 전 현황 파악용으로 작성됨.*
+*§1~10은 Fable 모델 전환 전 현황(2026-07-20). 아래 §11이 리팩터 결과로 §5/§9를 대체한다.*
+
+---
+
+## 11. OVN 리팩터 완료 (2026-07-26)
+
+§5 "올바른 방식(미구현)"과 §9 미해결과제 1~4를 구현·해결함. (Fable과 디버깅 → Opus가 검토·수정·검증)
+
+### 무엇이 바뀌었나
+- **OVN = Excel 누적합** (`ovn_tracker.py`): positions.json 체인 폐기. 어느 날짜를 재실행해도 전체내역만으로 결정론적 계산 → 하루 오염이 이후 날짜로 전파되지 않음.
+- **브로커 크로스체크** (`ovn_crosscheck.py`): Excel 누적 진입 OVN ↔ SS/NH 미결제약정(전일잔고). 불일치 시 `daily_review` **중단**하고 수동 확정 명령 안내. Excel 증적 누락/중복을 잡는 독립 검증축.
+- **SS 미결 컬럼 수정** (`pdf_parser.py`): `종목 구분 잔고 전일잔고 전일정산가 당일정산가 갱신차금`. 이전 컬럼 오류로 인한 잔여계약 오류 해소.
+- **메일 정확 특정** (`gmail_fetcher.py`): 발신자+제목으로 각 자료를 유일 지정, 추측 재시도·dedup 제거. 누락 시 경고.
+- **파싱 병합** (`parse_router.py`): (종목사,날짜)별 체결=CSV 우선, 미결=PDF/CSV.
+- **갱신차금**: 브로커 확정 갱신차금(PDF) 우선, 정산가차로 검산, 없으면 OHLCV 근사.
+
+### Opus 추가 수정 (Fable 인수인계본 대비)
+1. **`.gitignore` 크레덴셜 누락 보완** — `credentials.json`/`token.json`이 규칙에 없어 커밋 위험이었음(§10엔 있다고 기술됐으나 실제 누락). office_pc_pipeline 런타임/비밀 파일 명시 규칙 추가.
+2. **`ovn_tracker` 월경계 순회** — 단일 월 파일만 읽으면 월초에 OVN이 anchor로 되돌아가는 오염 재발. anchor월~대상월 전 파일 순회로 수정.
+3. **`daily_review` price_near** — 폐기 예정이던 positions.json 대신 **브로커 스냅샷 당일정산가**에서 로드해 BM31/BMA1 혼동 검증 유지(Fable본은 None으로 검증 비활성).
+
+### 검증
+- 합성데이터 전 로직 통과: 3일 누적 진입/종료 OVN, 재실행 무오염, 크로스체크 일치/불일치 감지, NH CSV 전일/당일 미결 분류. (`scratchpad/test_ovn.py`)
+- Fable: 07/15·16·21·23 실물 데이터 통과.
+- 실 데이터 정기운영 재검증은 office PC에서 `python main.py 2026/07/23` → `python daily_review.py 2026/07/23`.
+
+### 운영 노트
+- `ovn_anchor.json`은 `ovn_anchor.json.example` 복사해서 office PC에 1회 생성. 신뢰 시작일로 주기적 전진 권장.
+- `positions.json`은 더 이상 사용 안 함(삭제 무방).

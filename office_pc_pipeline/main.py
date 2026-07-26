@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 선물거래 증적 메인 실행 스크립트
-- Gmail에서 PDF 수신 → 파싱 → Excel 저장
+- Gmail에서 자료 수신 → 파싱·병합 → Excel 저장 + OVN 스냅샷 저장
 - Windows 작업 스케줄러에서 매일 실행
 """
 import sys
@@ -22,11 +22,9 @@ def log(msg: str):
 
 
 def run(target_date: str = None):
-    """
-    target_date: "YYYY/MM/DD" — 없으면 오늘 날짜
-    """
+    """target_date: "YYYY/MM/DD" — 없으면 오늘 날짜"""
     from gmail_fetcher import fetch_pdfs
-    from pdf_parser import parse_nh, parse_ss
+    from parse_router import parse_and_merge
     from excel_writer import save_to_excel
 
     if not target_date:
@@ -34,7 +32,7 @@ def run(target_date: str = None):
 
     log(f"=== 실행 시작 | 대상일: {target_date} ===")
 
-    # 1. Gmail에서 PDF 다운로드
+    # 1. Gmail에서 자료 다운로드 (제목으로 특정된 PDF/CSV)
     try:
         downloads = fetch_pdfs(target_date)
     except Exception as e:
@@ -43,44 +41,22 @@ def run(target_date: str = None):
         return
 
     if not downloads:
-        log("수신된 PDF 없음 — 종료")
+        log("수신된 자료 없음 — 종료")
         return
 
-    # 2. PDF 파싱
-    parsed_list = []
-    for item in downloads:
-        source = item["source"]
-        path = item["path"]
-        date_str = item["date"]
-
-        try:
-            if source == "NH선물":
-                parsed = parse_nh(str(path))
-            elif source == "SS선물":
-                parsed = parse_ss(str(path))
-            else:
-                log(f"[경고] 알 수 없는 출처: {source}")
-                continue
-
-            if not parsed.get("date"):
-                parsed["date"] = date_str
-
-            log(f"  [{source}] 파싱 완료 — 체결 {len(parsed.get('체결', []))}건")
-            parsed_list.append(parsed)
-
-        except Exception as e:
-            log(f"[오류] {source} PDF 파싱 실패: {path.name} — {e}")
-            log(traceback.format_exc())
+    # 2. 파싱 + 병합 — 종목사·날짜별로 체결(CSV 우선)과 미결(PDF/CSV)을 하나로 합친다.
+    parsed_list = parse_and_merge(downloads, log=log)
 
     if not parsed_list:
         log("파싱된 데이터 없음 — 종료")
         return
 
-    # 3. Excel 저장 — Gmail "after:" 검색은 여러 날짜를 한번에 반환하므로,
-    #    각 PDF의 실제 거래일(parsed["date"])별로 묶어서 해당 날짜 시트에만 저장한다.
+    # 3. 날짜별로 묶어서 Excel 저장 + OVN 스냅샷 저장
     by_date: dict[str, list] = {}
     for parsed in parsed_list:
         by_date.setdefault(parsed["date"], []).append(parsed)
+
+    from ovn_crosscheck import build_ovn_snapshot, save_snapshot
 
     for d, items in sorted(by_date.items()):
         try:
@@ -90,10 +66,20 @@ def run(target_date: str = None):
             log(f"[오류] Excel 저장 실패 ({d}): {e}")
             log(traceback.format_exc())
 
+        # 브로커 확정 미결제약정 스냅샷 저장 (daily_review 크로스체크용).
+        # 날짜별 파일이라 재실행해도 해당 날짜만 갱신 — positions.json 체인처럼 오염되지 않는다.
+        try:
+            snap = build_ovn_snapshot(items, d)
+            path = save_snapshot(snap)
+            log(f"[완료] OVN 스냅샷 저장 ({d}): 진입 KTB3 {snap['entry']['ktb3']:+d}/"
+                f"KTB10 {snap['entry']['ktb10']:+d}  → {path.name}")
+        except Exception as e:
+            log(f"[경고] OVN 스냅샷 저장 실패 ({d}): {e}")
+            log(traceback.format_exc())
+
     log("=== 실행 완료 ===\n")
 
 
 if __name__ == "__main__":
-    # 인수로 날짜 지정 가능: python main.py 2026/06/16
     target = sys.argv[1] if len(sys.argv) > 1 else None
     run(target)

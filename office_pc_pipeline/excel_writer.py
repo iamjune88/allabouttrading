@@ -248,30 +248,30 @@ def save_to_excel(parsed_list: list, trade_date: str = None):
             ws.cell(row=row, column=1, value="[미결잔고]").font = Font(bold=True, color="7030A0", name="맑은 고딕")
             row += 1
             if source == "NH선물":
-                headers = ["출처", "거래일", "계좌", "종목", "현재가", "거래구분", "BS", "잔량"]
+                headers = ["출처", "거래일", "계좌", "종목", "정산가", "거래유형", "BS", "잔량", "구분"]
                 _style_header(ws, row, len(headers))
                 for h, val in enumerate(headers, 1):
                     ws.cell(row=row, column=h, value=val)
                 row += 1
                 for item in 미결:
                     vals = [source, date, account,
-                            item.get("종목"), item.get("현재가"), item.get("거래구분"),
-                            item.get("BS"), item.get("잔량")]
+                            item.get("종목"), item.get("정산가"), item.get("거래유형"),
+                            item.get("BS"), item.get("잔량"), item.get("구분")]
                     for c, v in enumerate(vals, 1):
                         ws.cell(row=row, column=c, value=v)
                     _style_data(ws, row, len(vals), source)
                     row += 1
             else:
-                headers = ["출처", "거래일", "계좌", "종목", "구분", "잔량", "미결잔량", "평균매입가", "현재가", "평가손익"]
+                headers = ["출처", "거래일", "계좌", "종목", "구분", "잔고", "전일잔고", "전일정산가", "당일정산가", "갱신차금", "옵션가치"]
                 _style_header(ws, row, len(headers))
                 for h, val in enumerate(headers, 1):
                     ws.cell(row=row, column=h, value=val)
                 row += 1
                 for item in 미결:
                     vals = [source, date, account,
-                            item.get("종목"), item.get("구분"), item.get("잔량"),
-                            item.get("미결잔량"), item.get("평균매입가"), item.get("현재가"),
-                            item.get("평가손익")]
+                            item.get("종목"), item.get("구분"), item.get("잔고"),
+                            item.get("전일잔고"), item.get("전일정산가"), item.get("당일정산가"),
+                            item.get("갱신차금"), item.get("옵션가치")]
                     for c, v in enumerate(vals, 1):
                         ws.cell(row=row, column=c, value=v)
                     _style_data(ws, row, len(vals), source)

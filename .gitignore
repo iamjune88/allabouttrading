@@ -40,6 +40,17 @@ infomax/
 last_run.txt
 refresh_log.txt
 
+# office_pc_pipeline — 인증정보 / 런타임 데이터 (절대 커밋 금지)
+office_pc_pipeline/credentials.json
+office_pc_pipeline/token.json
+office_pc_pipeline/다운로드/
+office_pc_pipeline/결과/
+office_pc_pipeline/ovn_snapshots/
+office_pc_pipeline/ovn_anchor.json
+office_pc_pipeline/positions.json
+office_pc_pipeline/실행로그.txt
+office_pc_pipeline/_ohlcv_*.json
+
 # 기타
 .DS_Store
 Thumbs.db
