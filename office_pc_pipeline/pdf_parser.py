@@ -371,8 +371,18 @@ def _parse_ss_csv_text(text: str) -> dict:
 #   상단 미결행 = 전일미결(진입 OVN), 하단(빈줄 뒤) 미결행 = 당일미결(종료 OVN).
 # ─────────────────────────────────────────────
 def parse_nh_csv(csv_path: str) -> dict:
-    """NH선물 01A103 CSV → parse_nh() 스키마(체결/미결). CP949."""
-    return _parse_nh_csv_text(_read_text_cp949(csv_path))
+    """NH선물 01A103 CSV → parse_nh() 스키마(체결/미결). CP949.
+
+    거래일: NH CSV 내부엔 거래일이 없다(헤더 날짜는 전일·결제일이라 첫 8자리를 쓰면 07/22처럼
+    전일로 잘못 잡힘). 파일명의 YYYYMMDD(예: 20260723_01A103_...)를 신뢰해 덮어쓴다.
+    """
+    import os
+    result = _parse_nh_csv_text(_read_text_cp949(csv_path))
+    m = re.search(r"(20\d{6})", os.path.basename(str(csv_path)))
+    if m:
+        d = m.group(1)
+        result["date"] = f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+    return result
 
 
 def _hhmm(v):
