@@ -55,7 +55,12 @@ def _unify_fills(parsed: dict) -> list[dict]:
 
 
 def _upsert_master(wb, unified_rows: list[dict]):
-    """전체내역(Sheet1) 시트에 누적 — 동일 체결건은 중복 추가하지 않음"""
+    """전체내역(Sheet1)에 누적 — 저장 대상 거래일의 기존 행을 지우고 새로 넣는다(날짜 단위 교체).
+
+    값 기준 dedup(과거 방식)은 같은 시각·가격·수량의 '서로 다른' 체결을 중복으로 오인해
+    조용히 누락시켜 OVN 누적을 틀리게 했다(크로스체크가 이를 잡아냄). 재실행 시엔 해당
+    거래일 행을 통째로 교체하므로 재실행 안전성은 유지하면서 체결 누락은 없앤다.
+    """
     if MASTER_SHEET in wb.sheetnames:
         ws = wb[MASTER_SHEET]
     else:
@@ -64,21 +69,21 @@ def _upsert_master(wb, unified_rows: list[dict]):
         for h, val in enumerate(MASTER_HEADERS, 1):
             ws.cell(row=1, column=h, value=val)
 
-    existing_keys = set()
-    for r in range(2, ws.max_row + 1):
-        key = tuple(ws.cell(row=r, column=c).value for c in (1, 2, 3, 4, 5, 6, 7, 8))
-        existing_keys.add(key)
+    def _norm_d(v):
+        return v.strftime("%Y-%m-%d") if hasattr(v, "strftime") else str(v)
+
+    incoming_dates = {_norm_d(r["거래일"]) for r in unified_rows}
+    # 저장 대상 거래일의 기존 행 삭제(아래에서 위로)
+    for r in range(ws.max_row, 1, -1):
+        if _norm_d(ws.cell(row=r, column=2).value) in incoming_dates:
+            ws.delete_rows(r, 1)
 
     row = ws.max_row + 1
     for item in unified_rows:
         vals = [item[h] for h in MASTER_HEADERS]
-        key = tuple(vals[i] for i in (0, 1, 2, 3, 4, 5, 6, 7))
-        if key in existing_keys:
-            continue
         for c, v in enumerate(vals, 1):
             ws.cell(row=row, column=c, value=v)
         _style_data(ws, row, len(vals), item["출처"])
-        existing_keys.add(key)
         row += 1
 
     _auto_width(ws)

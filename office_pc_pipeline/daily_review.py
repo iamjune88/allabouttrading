@@ -31,6 +31,8 @@ parser.add_argument("--ktb3",  type=str, default=None,
                     help="KTB3 오버나잇 포지션 예: +240 (생략 시 Excel 누적합에서 자동 계산)")
 parser.add_argument("--ktb10", type=str, default=None,
                     help="KTB10 오버나잇 포지션 예: -140 (생략 시 Excel 누적합에서 자동 계산)")
+parser.add_argument("--no-git", action="store_true",
+                    help="git 커밋·푸쉬 건너뜀 (로컬에서 저널만 생성/검토)")
 args = parser.parse_args()
 
 today_kst = datetime.now(tz=KST)
@@ -126,7 +128,11 @@ def load_fills(date_str):
 print("[1/6] Excel 체결내역 로드...")
 fills = load_fills(DATE_STR)
 if not fills:
-    sys.exit(f"[오류] {DATE_STR} 체결내역 없음. main.py를 먼저 실행하세요.")
+    # 무거래(포지션 보유만) 날 — 체결이 없어도 갱신차금(OVN MTM) 리뷰는 유효.
+    # 브로커 자료가 아예 없으면(main.py 미실행) OVN 크로스체크 스냅샷도 없어 진짜 오류.
+    if _snapshot is None:
+        sys.exit(f"[오류] {DATE_STR} 체결·브로커자료 모두 없음. main.py를 먼저 실행하세요.")
+    print(f"      체결 0건 — 무거래(보유) 날로 처리 (갱신차금 리뷰만 생성)")
 
 codes = list({f["code"] for f in fills})
 print(f"      {len(fills)}건  종목: {codes}")
@@ -202,95 +208,112 @@ def start_tv():
             return
     sys.exit("[오류] TradingView CDP 연결 실패")
 
-def get_ohlcv(symbol, out_file, price_near=None, price_tol=1.5, max_retries=4):
-    """
-    price_near: 전일 정산가 기준 절대값 검증 (브로커 스냅샷 당일정산가에서 로드)
-    price_tol:  허용 편차 (기본 +-1.5pt)
-    chart_ready 직후에도 bar 데이터가 이전 심볼 것일 수 있으므로 가격으로 재검증.
-    """
-    env = os.environ.copy()
-    env.pop("ELECTRON_RUN_AS_NODE", None)
-    is_past = DATE_SLUG < today_kst.strftime("%Y%m%d")
-    last_raw, last_data = None, {"bars": []}
-
-    for attempt in range(max_retries):
-        if attempt > 0:
-            print(f"      [{symbol}] 재시도 {attempt}/{max_retries-1} (6초 대기)...")
-            time.sleep(6)
-
-        subprocess.run(
-            ["node", "src/cli/index.js", "symbol", symbol],
-            cwd=str(MCP_DIR), capture_output=True, env=env
-        )
-        for _ in range(15):  # 최대 30초
-            time.sleep(2)
-            r = subprocess.run(
-                ["node", "src/cli/index.js", "symbol"],
-                cwd=str(MCP_DIR), capture_output=True, env=env
-            )
+def _tv(env, *args):
+    """tradingview-mcp node CLI 호출 → stdout(str)."""
+    r = subprocess.run(["node", "src/cli/index.js", *args],
+                       cwd=str(MCP_DIR), capture_output=True, env=env)
+    raw = r.stdout
+    if isinstance(raw, bytes):
+        for enc in ("utf-8-sig", "utf-8", "cp949"):
             try:
-                st = json.loads(r.stdout.decode("utf-8", errors="replace"))
-                if st.get("symbol") == symbol and st.get("chart_ready", False):
-                    break
+                return raw.decode(enc)
             except Exception:
                 pass
+        return raw.decode("utf-8", errors="replace")
+    return raw
 
-        time.sleep(3)  # chart_ready 직후에도 bar 데이터 로드 시간 필요
 
-        # 항상 range 명령 전송 — 이전 실행이 다른 날짜 뷰포트를 고정했을 수 있음
-        subprocess.run(
-            ["node", "src/cli/index.js", "range",
-             "--from", str(SESSION_START), "--to", str(SESSION_END)],
-            cwd=str(MCP_DIR), capture_output=True, env=env
-        )
-        time.sleep(6)
-
-        result = subprocess.run(
-            ["node", "src/cli/index.js", "ohlcv", "--count", "500"],
-            cwd=str(MCP_DIR), capture_output=True, env=env
-        )
-        raw = result.stdout
-        if isinstance(raw, bytes):
-            for enc in ["utf-8-sig", "utf-8", "cp949"]:
-                try: raw = raw.decode(enc); break
-                except: pass
-
+def _set_symbol_ready(symbol, env):
+    _tv(env, "symbol", symbol)
+    for _ in range(15):  # 최대 30초 chart_ready 대기
+        time.sleep(2)
         try:
-            data = json.loads(raw)
+            st = json.loads(_tv(env, "symbol"))
+            if st.get("symbol") == symbol and st.get("chart_ready", False):
+                break
         except Exception:
-            continue
+            pass
+    time.sleep(3)
 
-        bars = data.get("bars", [])
-        if not bars:
-            continue
 
-        last_raw, last_data = raw, data
+def get_ohlcv(symbol, out_file, price_near=None, price_tol=1.5, timeframes=None):
+    """
+    기본은 항상 5분봉. 과거일자 백필에서만 1H봉으로 예외 대체한다.
+    TV 데스크톱은 얇은 KRX 선물의 5분봉 히스토리를 ~300봉(약 3거래일)만 보유하므로
+    오래된 날짜는 5분봉 세션이 비는데(=인트라데이 표현 불가), 그때만 1H봉(약 2주 보유)으로 채운다.
+    당일/최근일 등 5분봉이 되는 날은 그대로 5분봉. → 평소 운영은 5분봉 그대로.
 
-        # 검증1: 오늘 세션 봉이 반드시 있어야 함
-        session_bars = [b for b in bars if b["time"] >= SESSION_START]
-        if not session_bars:
-            print(f"      [{symbol}] 오늘 세션 봉 없음 -> 재시도")
-            continue
+    price_near: 정산가 기준 절대값 검증(BM31/BMA1 혼동 방지).
+    반환 data 에 '_resolution'(사용된 TF), '_partial'(세션 미완성 여부) 표시.
+    """
+    is_past = DATE_SLUG < today_kst.strftime("%Y%m%d")
+    if timeframes is None:
+        # 당일/미래일: 5분봉만(평소 운영). 과거일자만 5분봉 실패 시 1H 예외 대체.
+        timeframes = ("5", "60") if is_past else ("5",)
+    n_attempt = 2 if len(timeframes) > 1 else 4  # 5분봉 단독일 땐 재시도 여유
 
-        # 검증2: 전일 정산가 +-price_tol 범위 이내여야 정상 데이터
-        if price_near is not None:
-            closes = [b["close"] for b in session_bars]
-            median_c = sorted(closes)[len(closes) // 2]
-            if abs(median_c - price_near) > price_tol:
-                print(f"      [{symbol}] 가격 검증 실패: {median_c:.3f} (기준 {price_near:.3f}+-{price_tol}) -> 재시도")
+    env = os.environ.copy()
+    env.pop("ELECTRON_RUN_AS_NODE", None)
+    _set_symbol_ready(symbol, env)
+
+    best = None  # (data, raw, tf, n_session) — 세션봉은 있으나 개장 미포함 등 차선책
+    for tf in timeframes:
+        _tv(env, "timeframe", tf)
+        time.sleep(2)
+        for attempt in range(n_attempt):
+            if attempt > 0:
+                time.sleep(6)
+            _tv(env, "range", "--from", str(SESSION_START), "--to", str(SESSION_END))
+            time.sleep(6)
+            raw = _tv(env, "ohlcv", "--count", "500")
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+            bars = data.get("bars", [])
+            if not bars:
                 continue
 
+            session_bars = [b for b in bars if SESSION_START <= b["time"] <= SESSION_END + 300]
+            if not session_bars:
+                continue  # 이 TF엔 해당 세션 없음 → 다음 TF
+
+            # 가격 검증(정산가 ±tol) — 심볼 혼동/이상데이터 배제
+            if price_near is not None:
+                closes = sorted(b["close"] for b in session_bars)
+                median_c = closes[len(closes) // 2]
+                if abs(median_c - price_near) > price_tol:
+                    print(f"      [{symbol}/{tf}m] 가격검증 실패 {median_c:.3f} (기준 {price_near:.3f}±{price_tol})")
+                    continue
+
+            # 5분봉은 '개장 근처부터' 있어야 완전한 것으로 인정(부분세션이면 1H 우선)
+            covers_open = min(b["time"] for b in session_bars) <= SESSION_START + 3600
+            if tf == "5" and not covers_open:
+                if best is None:
+                    best = (data, raw, tf, len(session_bars))
+                print(f"      [{symbol}/{tf}m] 세션 개장부 결손 → 1H 시도")
+                break  # 다음 TF(60m)로
+
+            data["_resolution"] = tf
+            data["_partial"] = not covers_open
+            with open(out_file, "w", encoding="utf-8") as f:
+                f.write(raw)
+            note = "" if covers_open else " (부분세션)"
+            print(f"      {symbol}: {len(session_bars)}세션봉 취득 [{tf}분봉{note}]")
+            return data
+
+    # 어느 TF도 완전 세션을 못 줌 → 차선책(부분 5분봉)이라도 사용
+    if best is not None:
+        data, raw, tf, n = best
+        data["_resolution"] = tf
+        data["_partial"] = True
         with open(out_file, "w", encoding="utf-8") as f:
-            f.write(raw if isinstance(raw, str) else raw)
-        print(f"      {symbol}: {len(bars)}봉 취득")
+            f.write(raw)
+        print(f"      {symbol}: {n}세션봉 취득 [{tf}분봉 부분세션]")
         return data
 
-    # 모든 재시도 실패시 마지막 데이터로 진행
-    print(f"      [{symbol}] 경고: 가격 검증 실패 지속, 마지막 데이터로 진행")
-    if last_raw:
-        with open(out_file, "w", encoding="utf-8") as f:
-            f.write(last_raw if isinstance(last_raw, str) else last_raw)
-    return last_data
+    print(f"      [{symbol}] 경고: 어느 TF에서도 세션 봉 없음")
+    return {"bars": [], "_resolution": timeframes[0], "_partial": True}
 
 print("[2/6] TV CDP 확인 + OHLCV 취득...")
 if not check_cdp():
@@ -311,6 +334,14 @@ ohlcv_bm31 = get_ohlcv("BM31!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BM31.json",
                          price_near=_ktb3_ref)
 ohlcv_bma  = get_ohlcv("BMA1!", THIS_DIR / f"_ohlcv_{DATE_SLUG}_BMA1.json",
                          price_near=_ktb10_ref)
+
+# 사용된 봉주기 라벨(차트 표기용). 두 심볼이 다르면 함께 표기.
+def _tf_label(d):
+    tf = str(d.get("_resolution", "5"))
+    base = "1H봉" if tf == "60" else f"{tf}분봉"
+    return base + ("(부분세션)" if d.get("_partial") else "")
+_res_bm31, _res_bma = _tf_label(ohlcv_bm31), _tf_label(ohlcv_bma)
+_res_label = _res_bma if _res_bma == _res_bm31 else f"KTB10 {_res_bma}/KTB3 {_res_bm31}"
 
 
 # ── 4. 차트 데이터 처리 ───────────────────────────────────────────────────
@@ -508,7 +539,7 @@ fig.update_layout(
     font=dict(color="#e6edf3", size=11),
     title=dict(text=(
         f"KTB10 (BMA1!) 체결포함  ·  KTB3 (BM31!) 캐리{OVN_KTB3:+d}  |  "
-        f"{DATE_DISP} · 5분봉  |  "
+        f"{DATE_DISP} · {_res_label}  |  "
         f"SELL {total_sell_q} / BUY {total_buy_q}  avg {sell_avg:.3f}/{buy_avg:.3f}"
     ), font=dict(size=11)),
     height=620, margin=dict(l=55,r=80,t=52,b=35),
@@ -672,29 +703,32 @@ print(f"      저장: journal_{DATE_SLUG}.html  ({len(html)//1000:,}KB)")
 
 
 # ── 7. git 커밋·푸쉬 ──────────────────────────────────────────────────────
-print("[6/6] git 커밋·푸쉬...")
 import shutil
-shutil.copy(journal_path, REPO_DIR / f"journal_{DATE_SLUG}.html")
-shutil.copy(chart_path,   REPO_DIR / "journal_assets" / chart_path.name)
+if args.no_git:
+    print("[6/6] git 건너뜀 (--no-git) — 저널 HTML은 로컬에 생성됨")
+else:
+    print("[6/6] git 커밋·푸쉬...")
+    shutil.copy(journal_path, REPO_DIR / f"journal_{DATE_SLUG}.html")
+    shutil.copy(chart_path,   REPO_DIR / "journal_assets" / chart_path.name)
 
-repo_scripts = REPO_DIR / "office_pc_pipeline"
-shutil.copy(__file__, repo_scripts / "daily_review.py")
+    repo_scripts = REPO_DIR / "office_pc_pipeline"
+    shutil.copy(__file__, repo_scripts / "daily_review.py")
 
-subprocess.run(["git", "add",
-                f"journal_{DATE_SLUG}.html",
-                f"journal_assets/{chart_path.name}",
-                "office_pc_pipeline/daily_review.py"],
-               cwd=str(REPO_DIR))
+    subprocess.run(["git", "add",
+                    f"journal_{DATE_SLUG}.html",
+                    f"journal_assets/{chart_path.name}",
+                    "office_pc_pipeline/daily_review.py"],
+                   cwd=str(REPO_DIR))
 
-msg = (f"daily journal {DATE_SLUG}: "
-       f"KTB10 {OVN_KTB10:+d}→{final_pos_ktb10:+d} (S{sell_q10}/B{buy_q10}) | "
-       f"KTB3 {OVN_KTB3:+d}→{final_pos_ktb3:+d} (S{sell_q3}/B{buy_q3}) | "
-       f"PnL {total_pnl_all/10000:+.0f}만(갱신{total_ovn_pnl/10000:+.0f}+건별{total_pnl/10000:+.0f})\n\n"
-       f"Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>")
-r = subprocess.run(["git", "commit", "-m", msg], cwd=str(REPO_DIR), capture_output=True, text=True)
-print(f"      {r.stdout.strip().splitlines()[0] if r.stdout else r.stderr.strip()}")
-r2 = subprocess.run(["git", "push"], cwd=str(REPO_DIR), capture_output=True, text=True)
-print(f"      push: {r2.stdout.strip() or r2.stderr.strip()}")
+    msg = (f"daily journal {DATE_SLUG}: "
+           f"KTB10 {OVN_KTB10:+d}→{final_pos_ktb10:+d} (S{sell_q10}/B{buy_q10}) | "
+           f"KTB3 {OVN_KTB3:+d}→{final_pos_ktb3:+d} (S{sell_q3}/B{buy_q3}) | "
+           f"PnL {total_pnl_all/10000:+.0f}만(갱신{total_ovn_pnl/10000:+.0f}+건별{total_pnl/10000:+.0f})\n\n"
+           f"Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>")
+    r = subprocess.run(["git", "commit", "-m", msg], cwd=str(REPO_DIR), capture_output=True, text=True)
+    print(f"      {r.stdout.strip().splitlines()[0] if r.stdout else r.stderr.strip()}")
+    r2 = subprocess.run(["git", "push"], cwd=str(REPO_DIR), capture_output=True, text=True)
+    print(f"      push: {r2.stdout.strip() or r2.stderr.strip()}")
 
 # ── 종료 포지션 ── positions.json 체인 폐기: 다음 날 OVN은 Excel에서 재계산.
 end_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
