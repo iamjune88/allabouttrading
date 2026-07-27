@@ -23,11 +23,40 @@ def _norm_code(raw) -> str:
     return m.group(1) if m else str(raw)
 
 
+MULT = 1_000_000  # KTB3/KTB10: 1pt = 100만원/계약
+
+
+def _ss_settle_map(parsed: dict) -> dict:
+    """SS 미결의 당일정산가를 종목군(A65/A67)→정산가로."""
+    m = {}
+    for mi in parsed.get("미결", []):
+        code = str(mi.get("종목", ""))
+        s = mi.get("당일정산가")
+        if isinstance(s, (int, float)):
+            if code.startswith("A65"):
+                m["A65"] = float(s)
+            elif code.startswith("A67"):
+                m["A67"] = float(s)
+    return m
+
+
+def _ss_fill_pnl(code, side, qty, price, settle_map):
+    """SS 체결 실현손익 = 체결을 당일정산가에 마킹(NH 손익과 동일 규약).
+       매수 (정산-체결)×수량, 매도 (체결-정산)×수량. 정산가 없으면 ''.
+    """
+    settle = settle_map.get(str(code)[:3])
+    if settle is None or not isinstance(price, (int, float)) or not isinstance(qty, (int, float)):
+        return ""
+    diff = (settle - price) if "매수" in str(side) else (price - settle)
+    return int(round(diff * qty * MULT))
+
+
 def _unify_fills(parsed: dict) -> list[dict]:
     """NH/SS 체결내역을 공통 스키마(MASTER_HEADERS)로 변환"""
     source = parsed.get("source", "")
     date = parsed.get("date", "")
     account = parsed.get("account", "")
+    settle_map = _ss_settle_map(parsed) if source == "SS선물" else {}
     rows = []
     for item in parsed.get("체결", []):
         if source == "NH선물":
@@ -40,17 +69,28 @@ def _unify_fills(parsed: dict) -> list[dict]:
                 "거래금액": item.get("거래금액"), "손익": item.get("손익"),
                 "수수료": item.get("수수료"), "비고": "",
             })
-        else:  # SS선물
+        else:  # SS선물 — 체결 손익은 미제공이라 당일정산가로 계산(누계·총손익 정합)
             note = f"{item.get('조건구분', '')}/{item.get('결제구분', '')} #{item.get('번호', '')}"
+            code = _norm_code(item.get("종목"))
+            pnl = _ss_fill_pnl(code, item.get("구분"), item.get("수량"), item.get("가격"), settle_map)
             rows.append({
                 "출처": source, "거래일": date, "계좌": account,
-                "종목코드": _norm_code(item.get("종목")),
+                "종목코드": code,
                 "매수매도": item.get("구분"),
                 "수량": item.get("수량"), "가격": item.get("가격"),
                 "체결시간": item.get("시간", ""),
-                "거래금액": "", "손익": "",
+                "거래금액": "", "손익": pnl,
                 "수수료": "", "비고": note,
             })
+
+    # 정합성 가드: 계산한 SS 체결손익 합 == 브로커 [거래내역] 실현손익 합?
+    if source == "SS선물":
+        calc = sum(r["손익"] for r in rows if isinstance(r["손익"], int))
+        broker = sum(int(t["실현손익"]) for t in parsed.get("거래", [])
+                     if isinstance(t.get("실현손익"), (int, float)))
+        if parsed.get("거래") and abs(calc - broker) > 1:
+            print(f"[경고] SS({date}) 체결손익 계산합 {calc:+,} ≠ 거래내역 실현손익 {broker:+,} "
+                  f"(차 {calc-broker:+,}) — 정산가/체결 확인 필요")
     return rows
 
 

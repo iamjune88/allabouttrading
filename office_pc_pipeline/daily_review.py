@@ -585,10 +585,24 @@ _tag_cfg = _cls.load_cfg()
 _date_iso = f"{DATE_SLUG[:4]}-{DATE_SLUG[4:6]}-{DATE_SLUG[6:8]}"
 _CAT_COLOR = {"방향성": "#d29922", "커브": "#58a6ff", "상대가치": "#bc8cff",
               "헷지": "#3fb950", "차익": "#f778ba", "미분류": "#6e7681"}
+_CATS = _tag_cfg.get("categories") or list(_CAT_COLOR.keys())
+_catc_js = json.dumps(_CAT_COLOR, ensure_ascii=False)
 
 def _cat_badge(cat):
     c = _CAT_COLOR.get(cat, "#6e7681")
     return f'<span style="color:{c};font-size:11px;font-weight:600">{cat}</span>'
+
+def _cat_select(cat, leg, source, hh, mm, side):
+    """수정 가능한 구분 드롭다운(변경분은 '규칙 생성' 버튼이 override JSON으로 뽑음)."""
+    code_glob = "A65*" if leg == "KTB3" else "A67*"
+    opts = "".join(
+        f'<option value="{c}"{" selected" if c == cat else ""}>{c}</option>' for c in _CATS)
+    color = _CAT_COLOR.get(cat, "#6e7681")
+    return (f'<select class="catsel" data-date="{_date_iso}" data-src="{source}" '
+            f'data-code="{code_glob}" data-side="{side}" data-time="{hh:02d}:{mm:02d}" '
+            f'data-orig="{cat}" onchange="this.style.color=CATC[this.value]||\'#8b949e\'" '
+            f'style="background:#0d1117;border:1px solid #30363d;border-radius:4px;'
+            f'color:{color};font-size:11px;font-weight:600;padding:1px 2px">{opts}</select>')
 
 rows_html = ""
 pos10 = OVN_KTB10; pos3 = OVN_KTB3; cpnl = 0
@@ -611,7 +625,7 @@ for leg, side, qty, price, hh, mm, pnl, source, code in tagged:
            else f'<span style="color:#6e7681">{pos10:+d}</span>')
     rows_html += f"""
       <tr>
-        <td>{hh:02d}:{mm:02d}</td><td>{leg}</td><td>{_cat_badge(cat)}</td><td>{fmt_side(side)}</td><td>{qty}</td>
+        <td>{hh:02d}:{mm:02d}</td><td>{leg}</td><td>{_cat_select(cat, leg, source, hh, mm, side)}</td><td>{fmt_side(side)}</td><td>{qty}</td>
         <td>{price:.2f}</td>
         <td>{b3}</td><td>{b10}</td>
         <td>{fmt_pnl(pnl)}</td><td>{fmt_pnl(cpnl)}</td>
@@ -712,6 +726,11 @@ html = f"""<!DOCTYPE html>
   </tbody>
 </table></div>
 <p class="note">구분별 건별손익: {_cat_summary_html}</p>
+<div style="margin:8px 0 4px">
+  <button class="btn" onclick="genRules()">🏷 바꾼 구분 → 규칙 생성</button>
+  <span class="note">드롭다운으로 구분을 고친 뒤 누르면 아래에 JSON이 나옵니다. trade_tags.json의 "overrides" 배열에 붙여넣으면 리포트·재실행에 반영됩니다.</span>
+  <textarea id="rt" readonly style="width:100%;height:88px;margin-top:6px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;font-family:monospace;font-size:11px;padding:6px" placeholder="구분을 바꾼 뒤 버튼을 누르세요"></textarea>
+</div>
 
 <h2>내 코멘트</h2>
 <div class="cb"><label>오늘 매매 리뷰</label>
@@ -721,6 +740,16 @@ html = f"""<!DOCTYPE html>
 <p class="note">※ Ctrl+S 저장 시 레이아웃 깨짐 — 위 버튼 사용</p>
 
 <script>
+const CATC={_catc_js};
+function genRules(){{
+  var out=[];
+  document.querySelectorAll('.catsel').forEach(function(s){{
+    if(s.value!==s.dataset.orig){{
+      out.push({{date:s.dataset.date,source:s.dataset.src,code:s.dataset.code,side:s.dataset.side,time_from:s.dataset.time,time_to:s.dataset.time,"구분":s.value}});
+    }}
+  }});
+  document.getElementById('rt').value = out.length ? JSON.stringify(out,null,2) : '변경된 구분이 없습니다.';
+}}
 document.getElementById('sb').addEventListener('click',function(){{
   var cl=document.documentElement.cloneNode(true);
   ['sb','ss'].forEach(function(id){{var e=cl.querySelector('#'+id);if(e)e.remove();}});
