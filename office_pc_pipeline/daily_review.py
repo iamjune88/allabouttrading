@@ -572,17 +572,31 @@ final_pos_ktb10 = OVN_KTB10 + buy_q10 - sell_q10
 net_ktb3  = sell_q3 - buy_q3           # KTB3 순매도 = 숏 증가
 final_pos_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
 
+# 종목별로 태그해 시간순 병합 — KTB3/KTB10 잔고를 각각 독립적으로 누적한다.
+# (과거: 단일 pos에 두 종목을 섞어 'KTB10잔고'로 표기 → KTB3 체결이 KTB10 잔고를 오염)
+tagged = [("KTB10",) + t for t in agg_10] + [("KTB3",) + t for t in agg_3]
+tagged.sort(key=lambda x: (x[4], x[5]))  # x=(leg,side,qty,price,hh,mm,pnl)
+
 rows_html = ""
-pos = OVN_KTB10; cpnl = 0
-for side, qty, price, hh, mm, pnl in sorted(agg, key=lambda x: (x[3], x[4])):
-    pos += (-qty if side=="매도" else qty)
+pos10 = OVN_KTB10; pos3 = OVN_KTB3; cpnl = 0
+for leg, side, qty, price, hh, mm, pnl in tagged:
+    if leg == "KTB10":
+        pos10 += (-qty if side == "매도" else qty)
+    else:
+        pos3 += (-qty if side == "매도" else qty)
     cpnl += pnl
-    pc = "#f85149" if pos < 0 else "#3fb950"
+    c10 = "#f85149" if pos10 < 0 else "#3fb950"
+    c3  = "#f85149" if pos3  < 0 else "#3fb950"
+    # 이번 행이 건드린 종목만 강조, 나머지 종목은 현재 잔고를 흐리게 유지 표시
+    b3  = (f'<b style="color:{c3}">{pos3:+d}</b>'  if leg == "KTB3"
+           else f'<span style="color:#6e7681">{pos3:+d}</span>')
+    b10 = (f'<b style="color:{c10}">{pos10:+d}</b>' if leg == "KTB10"
+           else f'<span style="color:#6e7681">{pos10:+d}</span>')
     rows_html += f"""
       <tr>
-        <td>{hh:02d}:{mm:02d}</td><td>{fmt_side(side)}</td><td>{qty}</td>
+        <td>{hh:02d}:{mm:02d}</td><td>{leg}</td><td>{fmt_side(side)}</td><td>{qty}</td>
         <td>{price:.2f}</td>
-        <td style="color:{pc};font-weight:600">{pos:+d}</td>
+        <td>{b3}</td><td>{b10}</td>
         <td>{fmt_pnl(pnl)}</td><td>{fmt_pnl(cpnl)}</td>
       </tr>"""
 
@@ -623,7 +637,7 @@ html = f"""<!DOCTYPE html>
 </head>
 <body>
 <h1>KTB 선물 트레이딩 저널</h1>
-<p class="sub">{DATE_DISP} &nbsp;|&nbsp; NH선물 {len(fills)}건 ({len(agg)}버킷) &nbsp;|&nbsp; KTB10·KTB3 병행 차트</p>
+<p class="sub">{DATE_DISP} &nbsp;|&nbsp; NH+SS {len(fills)}건 ({len(tagged)}버킷) &nbsp;|&nbsp; KTB10·KTB3 병행 차트</p>
 
 <h2>포지션 요약</h2>
 <div class="cards">
@@ -659,17 +673,19 @@ html = f"""<!DOCTYPE html>
 <h2>차트 (KTB10 체결·KTB3 캐리 — 드래그 확대 / 더블클릭 리셋)</h2>
 <div class="chart-wrap">{div}</div>
 
-<h2>체결 내역 ({len(agg)}버킷 / 원본 {len(fills)}건)</h2>
+<h2>체결 내역 ({len(tagged)}버킷 / 원본 {len(fills)}건)</h2>
 <div class="tw"><table>
-  <thead><tr><th>시각</th><th>매매</th><th>수량</th><th>가격</th><th>KTB10잔고</th><th>건별손익</th><th>누계손익</th></tr></thead>
+  <thead><tr><th>시각</th><th>종목</th><th>매매</th><th>수량</th><th>가격</th><th>KTB3잔고</th><th>KTB10잔고</th><th>건별손익</th><th>누계손익</th></tr></thead>
   <tbody>
-    <tr class="sr"><td colspan="4">전일이월</td>
-      <td style="color:#f85149;font-weight:700">{OVN_KTB10:+d}</td><td>—</td><td>—</td></tr>
+    <tr class="sr"><td colspan="5">전일이월 (진입 OVN)</td>
+      <td style="color:{'#f85149' if OVN_KTB3<0 else '#3fb950' if OVN_KTB3>0 else '#8b949e'};font-weight:700">{OVN_KTB3:+d}</td>
+      <td style="color:{'#f85149' if OVN_KTB10<0 else '#3fb950' if OVN_KTB10>0 else '#8b949e'};font-weight:700">{OVN_KTB10:+d}</td>
+      <td>—</td><td>—</td></tr>
 {rows_html}
-    <tr class="sr"><td colspan="2"><strong>합계</strong></td>
-      <td>S:{total_sell_q}/B:{total_buy_q}</td><td>—</td>
-      <td style="color:#f85149;font-weight:700">{final_pos_ktb10:+d}</td>
-      <td>—</td><td>{fmt_pnl(total_pnl)}</td></tr>
+    <tr class="sr"><td colspan="5"><strong>합계</strong> &nbsp; S:{total_sell_q} / B:{total_buy_q}</td>
+      <td style="color:{'#f85149' if final_pos_ktb3<0 else '#3fb950' if final_pos_ktb3>0 else '#8b949e'};font-weight:700">{final_pos_ktb3:+d}</td>
+      <td style="color:{'#f85149' if final_pos_ktb10<0 else '#3fb950' if final_pos_ktb10>0 else '#8b949e'};font-weight:700">{final_pos_ktb10:+d}</td>
+      <td>{fmt_pnl(total_pnl)}</td><td>{fmt_pnl(total_pnl)}</td></tr>
   </tbody>
 </table></div>
 
