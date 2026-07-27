@@ -141,17 +141,19 @@ print(f"      {len(fills)}건  종목: {codes}")
 # ── 2. 체결 집계 (시각+방향+가격 기준) ────────────────────────────────────
 def aggregate_fills(fills):
     from collections import defaultdict
-    bucket = defaultdict(lambda: {"qty": 0, "pnl": 0})
+    bucket = defaultdict(lambda: {"qty": 0, "pnl": 0, "source": "", "code": ""})
     for f in fills:
         _t = str(f["time"]).split(":")  # "09:15" 또는 "9:15" 모두 허용
         hh = int(_t[0]) if _t[0].strip().isdigit() else 0
         mm = int(_t[1]) if len(_t) > 1 and _t[1].strip().isdigit() else 0
         key = (f["side"], float(f["price"]), hh, mm)
-        bucket[key]["qty"] += f["qty"]
-        bucket[key]["pnl"] += f["pnl"]
+        b = bucket[key]
+        b["qty"] += f["qty"]; b["pnl"] += f["pnl"]
+        b["source"] = b["source"] or f.get("source", "")   # 버킷 내 체결은 출처·종목 동일
+        b["code"] = b["code"] or f.get("code", "")
     result = []
     for (side, price, hh, mm), v in sorted(bucket.items(), key=lambda x: (x[0][2], x[0][3])):
-        result.append((side, v["qty"], price, hh, mm, v["pnl"]))
+        result.append((side, v["qty"], price, hh, mm, v["pnl"], v["source"], v["code"]))
     return result
 
 # 종목코드 분류: A67XX = KTB10, A65XX = KTB3
@@ -486,7 +488,7 @@ def add_markers(agg_list, col, show_legend, sell_avg_val, buy_avg_val):
         ("매도","#FF4444","triangle-down","SELL"),
         ("매수","#44BB44","triangle-up",  "BUY"),
     ]:
-        tlist = [(s,q,p,hh,mm) for s,q,p,hh,mm,_ in agg_list if s==side_kor]
+        tlist = [(s,q,p,hh,mm) for s,q,p,hh,mm,*_ in agg_list if s==side_kor]
         if not tlist: continue
         xs = [datetime.fromtimestamp(bar_ts_fn(hh,mm), tz=KST) for _,q,p,hh,mm in tlist]
         ys = [p for _,q,p,hh,mm in tlist]
@@ -575,16 +577,31 @@ final_pos_ktb3  = OVN_KTB3  + buy_q3  - sell_q3
 # 종목별로 태그해 시간순 병합 — KTB3/KTB10 잔고를 각각 독립적으로 누적한다.
 # (과거: 단일 pos에 두 종목을 섞어 'KTB10잔고'로 표기 → KTB3 체결이 KTB10 잔고를 오염)
 tagged = [("KTB10",) + t for t in agg_10] + [("KTB3",) + t for t in agg_3]
-tagged.sort(key=lambda x: (x[4], x[5]))  # x=(leg,side,qty,price,hh,mm,pnl)
+tagged.sort(key=lambda x: (x[4], x[5]))  # x=(leg,side,qty,price,hh,mm,pnl,source,code)
+
+# 거래 구분(전략) 분류 — 하이브리드(출처 기본값 + trade_tags.json override)
+import classify as _cls
+_tag_cfg = _cls.load_cfg()
+_date_iso = f"{DATE_SLUG[:4]}-{DATE_SLUG[4:6]}-{DATE_SLUG[6:8]}"
+_CAT_COLOR = {"방향성": "#d29922", "커브": "#58a6ff", "상대가치": "#bc8cff",
+              "헷지": "#3fb950", "차익": "#f778ba", "미분류": "#6e7681"}
+
+def _cat_badge(cat):
+    c = _CAT_COLOR.get(cat, "#6e7681")
+    return f'<span style="color:{c};font-size:11px;font-weight:600">{cat}</span>'
 
 rows_html = ""
 pos10 = OVN_KTB10; pos3 = OVN_KTB3; cpnl = 0
-for leg, side, qty, price, hh, mm, pnl in tagged:
+_seen_cat = {}   # 구분별 건별손익 합계(표 하단 요약용)
+for leg, side, qty, price, hh, mm, pnl, source, code in tagged:
     if leg == "KTB10":
         pos10 += (-qty if side == "매도" else qty)
     else:
         pos3 += (-qty if side == "매도" else qty)
     cpnl += pnl
+    cat = _cls.classify({"date": _date_iso, "source": source, "code": code,
+                         "side": side, "time": f"{hh:02d}:{mm:02d}"}, _tag_cfg)
+    _seen_cat[cat] = _seen_cat.get(cat, 0) + pnl
     c10 = "#f85149" if pos10 < 0 else "#3fb950"
     c3  = "#f85149" if pos3  < 0 else "#3fb950"
     # 이번 행이 건드린 종목만 강조, 나머지 종목은 현재 잔고를 흐리게 유지 표시
@@ -594,11 +611,17 @@ for leg, side, qty, price, hh, mm, pnl in tagged:
            else f'<span style="color:#6e7681">{pos10:+d}</span>')
     rows_html += f"""
       <tr>
-        <td>{hh:02d}:{mm:02d}</td><td>{leg}</td><td>{fmt_side(side)}</td><td>{qty}</td>
+        <td>{hh:02d}:{mm:02d}</td><td>{leg}</td><td>{_cat_badge(cat)}</td><td>{fmt_side(side)}</td><td>{qty}</td>
         <td>{price:.2f}</td>
         <td>{b3}</td><td>{b10}</td>
         <td>{fmt_pnl(pnl)}</td><td>{fmt_pnl(cpnl)}</td>
       </tr>"""
+
+# 구분별 건별손익 요약(표 하단) — 갱신차금 귀속은 주/월 리포트(review_report.py)에서.
+_cat_summary_html = " &nbsp;·&nbsp; ".join(
+    f'{_cat_badge(c)} <b style="color:{"#3fb950" if v>0 else "#f85149" if v<0 else "#8b949e"}">{v/10000:+.0f}만</b>'
+    for c, v in sorted(_seen_cat.items(), key=lambda kv: -abs(kv[1]))
+) or "체결 없음"
 
 html = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -675,19 +698,20 @@ html = f"""<!DOCTYPE html>
 
 <h2>체결 내역 ({len(tagged)}버킷 / 원본 {len(fills)}건)</h2>
 <div class="tw"><table>
-  <thead><tr><th>시각</th><th>종목</th><th>매매</th><th>수량</th><th>가격</th><th>KTB3잔고</th><th>KTB10잔고</th><th>건별손익</th><th>누계손익</th></tr></thead>
+  <thead><tr><th>시각</th><th>종목</th><th>구분</th><th>매매</th><th>수량</th><th>가격</th><th>KTB3잔고</th><th>KTB10잔고</th><th>건별손익</th><th>누계손익</th></tr></thead>
   <tbody>
-    <tr class="sr"><td colspan="5">전일이월 (진입 OVN)</td>
+    <tr class="sr"><td colspan="6">전일이월 (진입 OVN)</td>
       <td style="color:{'#f85149' if OVN_KTB3<0 else '#3fb950' if OVN_KTB3>0 else '#8b949e'};font-weight:700">{OVN_KTB3:+d}</td>
       <td style="color:{'#f85149' if OVN_KTB10<0 else '#3fb950' if OVN_KTB10>0 else '#8b949e'};font-weight:700">{OVN_KTB10:+d}</td>
       <td>—</td><td>—</td></tr>
 {rows_html}
-    <tr class="sr"><td colspan="5"><strong>합계</strong> &nbsp; S:{total_sell_q} / B:{total_buy_q}</td>
+    <tr class="sr"><td colspan="6"><strong>합계</strong> &nbsp; S:{total_sell_q} / B:{total_buy_q}</td>
       <td style="color:{'#f85149' if final_pos_ktb3<0 else '#3fb950' if final_pos_ktb3>0 else '#8b949e'};font-weight:700">{final_pos_ktb3:+d}</td>
       <td style="color:{'#f85149' if final_pos_ktb10<0 else '#3fb950' if final_pos_ktb10>0 else '#8b949e'};font-weight:700">{final_pos_ktb10:+d}</td>
       <td>{fmt_pnl(total_pnl)}</td><td>{fmt_pnl(total_pnl)}</td></tr>
   </tbody>
 </table></div>
+<p class="note">구분별 건별손익: {_cat_summary_html}</p>
 
 <h2>내 코멘트</h2>
 <div class="cb"><label>오늘 매매 리뷰</label>
