@@ -727,9 +727,8 @@ html = f"""<!DOCTYPE html>
 </table></div>
 <p class="note">구분별 건별손익: {_cat_summary_html}</p>
 <div style="margin:8px 0 4px">
-  <button class="btn" onclick="genRules()">🏷 바꾼 구분 → 규칙 생성</button>
-  <span class="note">드롭다운으로 구분을 고친 뒤 누르면 아래에 JSON이 나옵니다. trade_tags.json의 "overrides" 배열에 붙여넣으면 리포트·재실행에 반영됩니다.</span>
-  <textarea id="rt" readonly style="width:100%;height:88px;margin-top:6px;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;font-family:monospace;font-size:11px;padding:6px" placeholder="구분을 바꾼 뒤 버튼을 누르세요"></textarea>
+  <button class="btn" onclick="genRules()">🏷 바꾼 구분 복사</button>
+  <span id="rtmsg" class="note"></span>
 </div>
 
 <h2>내 코멘트</h2>
@@ -741,6 +740,12 @@ html = f"""<!DOCTYPE html>
 
 <script>
 const CATC={_catc_js};
+function _clip(txt){{
+  if(navigator.clipboard&&navigator.clipboard.writeText){{return navigator.clipboard.writeText(txt);}}
+  var t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);
+  t.select();try{{document.execCommand('copy');}}catch(e){{}}document.body.removeChild(t);
+  return Promise.resolve();
+}}
 function genRules(){{
   var out=[];
   document.querySelectorAll('.catsel').forEach(function(s){{
@@ -748,7 +753,11 @@ function genRules(){{
       out.push({{date:s.dataset.date,source:s.dataset.src,code:s.dataset.code,side:s.dataset.side,time_from:s.dataset.time,time_to:s.dataset.time,"구분":s.value}});
     }}
   }});
-  document.getElementById('rt').value = out.length ? JSON.stringify(out,null,2) : '변경된 구분이 없습니다.';
+  var msg=document.getElementById('rtmsg');
+  if(!out.length){{msg.textContent='변경된 구분이 없습니다.';return;}}
+  _clip(JSON.stringify(out)).then(function(){{
+    msg.textContent='✓ '+out.length+'건 클립보드 복사됨 — trade_tags.json "overrides"에 붙여넣기';
+  }});
 }}
 document.getElementById('sb').addEventListener('click',function(){{
   var cl=document.documentElement.cloneNode(true);
