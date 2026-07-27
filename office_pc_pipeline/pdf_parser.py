@@ -339,6 +339,10 @@ def _parse_ss_csv_text(text: str) -> dict:
         if len(cols) < 7 or not re.match(r"^A\d{4}", cols[3]):
             continue
         date_raw, time_s, account, code, bs, qty, price = cols[:7]
+        # 거래시간 "9:15" → "09:15" (시 0패딩; NH·PDF와 형식 통일)
+        _tm = re.match(r"(\d{1,2}):(\d{2})", time_s)
+        if _tm:
+            time_s = f"{int(_tm.group(1)):02d}:{_tm.group(2)}"
         if not result["date"] and re.match(r"^\d{8}$", date_raw):
             result["date"] = f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}"
         if not result["account"]:

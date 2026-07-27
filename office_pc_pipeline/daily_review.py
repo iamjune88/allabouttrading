@@ -143,7 +143,9 @@ def aggregate_fills(fills):
     from collections import defaultdict
     bucket = defaultdict(lambda: {"qty": 0, "pnl": 0})
     for f in fills:
-        hh, mm = int(f["time"][:2]), int(f["time"][3:5])
+        _t = str(f["time"]).split(":")  # "09:15" 또는 "9:15" 모두 허용
+        hh = int(_t[0]) if _t[0].strip().isdigit() else 0
+        mm = int(_t[1]) if len(_t) > 1 and _t[1].strip().isdigit() else 0
         key = (f["side"], float(f["price"]), hh, mm)
         bucket[key]["qty"] += f["qty"]
         bucket[key]["pnl"] += f["pnl"]

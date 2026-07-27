@@ -28,12 +28,16 @@ DOWNLOAD_DIR.mkdir(exist_ok=True)
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
-# 수집 스펙: 각 항목이 메일 1건을 유일하게 특정한다.
+# 수집 스펙: 각 항목이 (발신자+제목+확장자)로 메일을 특정한다.
+# sender가 빈 문자열이면 발신자 무관·제목만으로 매칭(발신자가 바뀔 수 있는 자료용).
+#   SS 매매내역 CSV는 자동계정(master@ssfutures.com)이 아니라 담당자 개인메일
+#   (예: chanwoo0822.choi@samsung.com)로 오고, 담당자가 바뀌면 주소도 바뀌므로
+#   고유 제목 "매매내역_삼성선물"만으로 잡는다.
 FETCH_SPECS = [
     {"role": "SS미결(PDF)", "source": "SS선물", "sender": "master@ssfutures.com",
      "subject": "선물옵션거래 및 예탁자산현황(가정산보고서)", "ext": "pdf", "required": True},
-    {"role": "SS체결(CSV)", "source": "SS선물", "sender": "master@ssfutures.com",
-     "subject": "매매내역_삼성선물", "ext": "csv", "required": True},
+    {"role": "SS체결(CSV)", "source": "SS선물", "sender": "",
+     "subject": "매매내역_삼성선물", "ext": "csv", "required": False},
     {"role": "NH체결+미결(CSV)", "source": "NH선물", "sender": "nhfutures@futures.co.kr",
      "subject": "국문가정산(체결시분)", "ext": "csv", "required": True},
 ]
@@ -75,7 +79,8 @@ def fetch_pdfs(target_date: str = None) -> list[dict]:
     results = []
 
     for spec in FETCH_SPECS:
-        q = (f'from:{spec["sender"]} after:{target_date} '
+        from_clause = f'from:{spec["sender"]} ' if spec.get("sender") else ""
+        q = (f'{from_clause}after:{target_date} '
              f'has:attachment filename:{spec["ext"]} subject:"{spec["subject"]}"')
         resp = service.users().messages().list(userId="me", q=q).execute()
         messages = resp.get("messages", [])
