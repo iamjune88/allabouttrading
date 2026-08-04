@@ -1,19 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-거래 구분(전략) 분류 — 하이브리드.
+거래 구분(전략) 분류.
 
-우선순위: overrides(개별 체결/포지션 규칙) → broker_default(출처별 기본값) → '미분류'.
-의도(커브냐 방향성이냐)는 체결 데이터에 없으므로, 중개사별 기본값으로 자동 초안을 잡고
-예외는 trade_tags.json overrides로 개별 재분류한다(하이브리드).
+우선순위: overrides(개별 규칙) → 실제 커브 판정 → ovn_default / broker_default.
 
-설정(trade_tags.json)은 단일 진실원천 — 저널·리포트가 매번 이 파일을 읽어 실시간 분류하므로,
-분류를 바꿔도 Excel 재생성이 필요 없다.
+★커브는 중개사나 '오버나잇 여부'로 찍지 않는다 — 커브는 매칭되는 두 다리(3Y↔10Y)가 필요하다.
+  그날 '진입 오버나잇'이 KTB3와 KTB10을 반대부호로 동시 보유할 때만, 그 OVN 레그를 커브로 본다.
+  그 외(단일 상품 아웃라이트, 인트라데이 스캘프)는 방향성. 예외는 trade_tags.json overrides로 재분류.
+
+설정(trade_tags.json)은 단일 진실원천 — 저널·리포트가 매번 읽어 실시간 분류(Excel 재생성 불필요).
+분류는 어디에도 누적 저장하지 않으므로, 이 로직/설정을 고치면 과거 기간리뷰도 자동으로 재계산된다.
 """
 import fnmatch
 import json
 from pathlib import Path
 
 CFG_FILE = Path(__file__).parent / "trade_tags.json"
+SNAP_DIR = Path(__file__).parent / "ovn_snapshots"
+
+_curve_cache = {}
 
 
 def load_cfg():
@@ -22,7 +27,26 @@ def load_cfg():
             return json.loads(CFG_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return {"broker_default": {}, "ovn_default": "미분류", "overrides": []}
+    return {"broker_default": {}, "ovn_default": "방향성", "overrides": []}
+
+
+def _is_curve_ovn_date(date) -> bool:
+    """그날 진입 오버나잇이 KTB3·KTB10을 반대부호로 '동시 보유'하면 True(실제 커브 캐리)."""
+    d = str(date or "")
+    if d in _curve_cache:
+        return _curve_cache[d]
+    res = False
+    p = SNAP_DIR / (d.replace("-", "") + ".json")
+    if p.exists():
+        try:
+            e = json.loads(p.read_text(encoding="utf-8")).get("entry", {}) or {}
+            k3 = int(e.get("ktb3", 0) or 0)
+            k10 = int(e.get("ktb10", 0) or 0)
+            res = bool(k3 and k10 and (k3 > 0) != (k10 > 0))
+        except Exception:
+            res = False
+    _curve_cache[d] = res
+    return res
 
 
 def _hm(s):
@@ -68,6 +92,9 @@ def classify(fill, cfg=None):
     for rule in cfg.get("overrides", []):
         if _match(rule, fill):
             return rule.get("구분", "미분류")
+    # 실제 커브: OVN 캐리 레그이면서, 그날 진입 OVN이 3Y·10Y 반대 동시보유일 때만
+    if fill.get("ovn") and _is_curve_ovn_date(fill.get("date", "")):
+        return "커브"
     if fill.get("ovn"):
-        return cfg.get("ovn_default", "미분류")
-    return cfg.get("broker_default", {}).get(fill.get("source"), "미분류")
+        return cfg.get("ovn_default", "방향성")
+    return cfg.get("broker_default", {}).get(fill.get("source"), "방향성")
